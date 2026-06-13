@@ -11,6 +11,7 @@ const CONFIG = {
   OBSTACLE_MAX: 4,        // ランダム障害物の最大数（初期値4）
   CPU_THINK_TIME: 600,    // CPUの思考演出時間(ms)（Step2で使用）
   ANIM_SPEED: 1.0,        // アニメーション速度の倍率（Step3で使用。大きいほど速い）
+  CELL_MAX_STRETCH: 1.3,  // セルの縦横比の許容上限。空き縦スペースを使ってマスを縦に広げ、タップしやすくする
 
   /* --- マップサイズ定義（cols=横, rows=縦） --- */
   FIELD_SIZES: {

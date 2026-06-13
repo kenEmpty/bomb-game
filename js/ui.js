@@ -63,6 +63,35 @@ const UI = {
         el.appendChild(cell);
       }
     }
+    this.fitBoard();
+  },
+
+  /* 盤面サイズを利用可能スペースに合わせて最大化する。
+   * 横はできるだけ広く、さらに縦の空きスペースを使ってマスを縦に伸ばし
+   * （上限 CELL_MAX_STRETCH）、スマホでもタップしやすい大きさにする。 */
+  fitBoard() {
+    const g = this.game;
+    if (!g) return;
+    const board = this.boardEl;
+    const wrap = document.getElementById('board-wrap');
+    if (!wrap || wrap.clientWidth === 0 || wrap.clientHeight === 0) return;
+
+    const ws = getComputedStyle(wrap);
+    const W = wrap.clientWidth - parseFloat(ws.paddingLeft) - parseFloat(ws.paddingRight);
+    const H = wrap.clientHeight - parseFloat(ws.paddingTop) - parseFloat(ws.paddingBottom);
+    const gap = parseFloat(getComputedStyle(board).columnGap) || 0;
+    const cols = g.cols, rows = g.rows;
+    const S = CONFIG.CELL_MAX_STRETCH;
+
+    // 横・縦それぞれに収まる最大セル寸法
+    let cellW = (W - gap * (cols - 1)) / cols;
+    let cellH = (H - gap * (rows - 1)) / rows;
+    // 縦横比が極端にならないよう制限（空きスペースは使うが歪ませない）
+    if (cellH > cellW * S) cellH = cellW * S;
+    if (cellW > cellH * S) cellW = cellH * S;
+
+    board.style.width = (cellW * cols + gap * (cols - 1)) + 'px';
+    board.style.height = (cellH * rows + gap * (rows - 1)) + 'px';
   },
 
   // 座標→セル要素

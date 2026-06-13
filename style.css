@@ -214,7 +214,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
+  padding: 4px;
   min-height: 0;
 }
 #board {
@@ -222,10 +222,7 @@ html, body {
   grid-template-columns: repeat(var(--cols), 1fr);
   grid-template-rows: repeat(var(--rows), 1fr);
   gap: 3px;
-  width: min(96vw, 92vh, 560px);
-  /* 縦横比をマスの数に合わせて正方形セルを保つ */
-  aspect-ratio: var(--cols) / var(--rows);
-  max-height: 100%;
+  /* 実寸は JS(UI.fitBoard) が利用可能なスペースに合わせて設定する */
   position: relative; /* FXオーバーレイの基準 */
 }
 .cell {

@@ -157,6 +157,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('start-btn').addEventListener('click', startGame);
 
+  // 画面サイズ・向きが変わったら盤面サイズを再計算
+  const refit = () => { if (UI.game) UI.fitBoard(); };
+  window.addEventListener('resize', refit);
+  window.addEventListener('orientationchange', refit);
+
   // サウンド切替（🔊/🔇）
   document.getElementById('sound-btn').addEventListener('click', e => {
     const muted = Sound.toggleMute();
