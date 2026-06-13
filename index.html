@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <!-- スマホ最適化：拡大禁止・セーフエリア対応 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>ボムサバイバル</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ===== 設定画面 ===== -->
+  <section id="setup-screen" class="screen active">
+    <div class="panel">
+      <h1>💣 ボムサバイバル</h1>
+      <p class="subtitle">爆弾で地形を壊しながら最後の1人を目指せ</p>
+
+      <div class="field">
+        <label>マップサイズ</label>
+        <div class="seg" id="opt-size">
+          <button data-val="small" class="seg-btn">小 8×7</button>
+          <button data-val="medium" class="seg-btn active">中 10×9</button>
+          <button data-val="large" class="seg-btn">大 12×10</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>プレイ人数</label>
+        <div class="seg" id="opt-count">
+          <button data-val="2" class="seg-btn active">2人</button>
+          <button data-val="3" class="seg-btn">3人</button>
+          <button data-val="4" class="seg-btn">4人</button>
+        </div>
+      </div>
+
+      <!-- Step2 で有効化されるCPU設定（プレイヤーごとに人間/CPUを選ぶ） -->
+      <div class="field" id="opt-players-wrap">
+        <label>各プレイヤー設定</label>
+        <div id="opt-players"></div>
+      </div>
+
+      <div class="field">
+        <label>ランダム障害物</label>
+        <div class="seg" id="opt-obstacles">
+          <button data-val="off" class="seg-btn active">OFF</button>
+          <button data-val="on" class="seg-btn">ON</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>移動ルール（同一ターン内）</label>
+        <div class="seg" id="opt-revisit">
+          <button data-val="allow" class="seg-btn active">再訪可能</button>
+          <button data-val="forbid" class="seg-btn">再訪禁止</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>効果音</label>
+        <div class="seg" id="opt-se">
+          <button data-val="on" class="seg-btn active">ON</button>
+          <button data-val="off" class="seg-btn">OFF</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>BGM</label>
+        <div class="seg" id="opt-bgm">
+          <button data-val="off" class="seg-btn active">OFF</button>
+          <button data-val="on" class="seg-btn">ON</button>
+        </div>
+      </div>
+
+      <button id="start-btn" class="primary-btn">ゲーム開始</button>
+    </div>
+  </section>
+
+  <!-- ===== ゲーム画面 ===== -->
+  <section id="game-screen" class="screen">
+    <header id="hud">
+      <div class="hud-item"><span class="hud-label">ターン</span><span id="hud-turn">1</span></div>
+      <div class="hud-item" id="hud-current-wrap"><span class="hud-label">手番</span><span id="hud-current">P1</span></div>
+      <div class="hud-item"><span class="hud-label">残り</span><span id="hud-alive">2</span></div>
+      <button id="sound-btn" class="icon-btn" title="サウンド切替">🔊</button>
+      <button id="menu-btn" class="icon-btn" title="メニュー">≡</button>
+    </header>
+
+    <!-- プレイヤー一覧（手番・生存状況を一目で確認） -->
+    <div id="roster"></div>
+
+    <div id="board-wrap">
+      <div id="board"></div>
+    </div>
+
+    <footer id="action-bar">
+      <div id="step-dots"></div>
+      <p id="status-msg">準備中…</p>
+    </footer>
+  </section>
+
+  <!-- ===== メニュー / 勝利オーバーレイ ===== -->
+  <div id="overlay" class="overlay">
+    <div class="overlay-card">
+      <h2 id="overlay-title">メニュー</h2>
+      <p id="overlay-msg"></p>
+      <button id="overlay-resume" class="primary-btn">ゲームに戻る</button>
+      <button id="overlay-restart" class="ghost-btn">設定画面に戻る</button>
+    </div>
+  </div>
+
+  <!-- 読み込み順：設定→ゲームロジック→UI→起動 -->
+  <script src="js/config.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/cpu.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
