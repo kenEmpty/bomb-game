@@ -186,6 +186,21 @@ html, body {
   justify-content: center;
 }
 .pchip-label { font-size: 0.8rem; color: var(--text); }
+/* チーム戦：チームごとのまとまり */
+#roster.team-mode { gap: 12px; }
+.team-group {
+  --tcolor: #888;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 12px;
+  border: 2px solid var(--tcolor);
+  background: rgba(255, 255, 255, 0.04);
+}
+.team-group.team-dead { opacity: 0.4; filter: grayscale(0.7); }
+.team-name { font-size: 0.75rem; font-weight: bold; color: var(--tcolor); }
+
 /* 手番中のプレイヤーを強調 */
 .pchip.current {
   border-color: var(--pcolor);
@@ -289,6 +304,18 @@ html, body {
 }
 .token-badge.you { background: #2ec4b6; }   /* あなた */
 .token-badge.cpu { background: #555; }       /* CPU */
+
+/* チームカラーの帯（足元） */
+.team-flag {
+  position: absolute;
+  bottom: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64%;
+  height: 5px;
+  border-radius: 3px;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.6);
+}
 
 /* 移動したトークンの着地アニメ */
 .token.moved { animation: land 0.28s ease-out; }

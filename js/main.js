@@ -13,12 +13,16 @@ const setupState = {
   se: true,        // 効果音（既定ON）
   bgm: false,      // BGM（既定OFF）
   cpuDebug: false, // CPU評価デバッグ表示（既定OFF）
-  // 各プレイヤーの human/CPU 設定（Step2で本格使用）。既定は全員human。
+  mode: 'ffa',     // ゲームモード 'ffa'(個人戦) / 'team'(チーム戦)
+  teamMode: 'random', // チーム編成 'random' / 'manual'
+  teamCount: 2,    // チーム数（将来3〜4へ拡張可能）
+  friendlyFire: false, // 味方攻撃（既定OFF）
+  // 各プレイヤー設定。team は手動チーム編成で使用（既定は交互割り当て）。
   players: [
-    { isCPU: false, difficulty: 'normal' },
-    { isCPU: false, difficulty: 'normal' },
-    { isCPU: false, difficulty: 'normal' },
-    { isCPU: false, difficulty: 'normal' },
+    { isCPU: false, difficulty: 'normal', team: 0 },
+    { isCPU: false, difficulty: 'normal', team: 1 },
+    { isCPU: false, difficulty: 'normal', team: 0 },
+    { isCPU: false, difficulty: 'normal', team: 1 },
   ],
 };
 
@@ -82,8 +86,37 @@ function renderPlayerOptions() {
       row.appendChild(diffSeg);
     }
 
+    // チーム選択（チーム戦＋手動編成のときのみ）
+    if (setupState.mode === 'team' && setupState.teamMode === 'manual') {
+      if (conf.team == null || conf.team >= setupState.teamCount) conf.team = i % setupState.teamCount;
+      const teamSeg = document.createElement('div');
+      teamSeg.className = 'seg mini team-select';
+      for (let t = 0; t < setupState.teamCount; t++) {
+        const b = document.createElement('button');
+        b.className = 'seg-btn' + (conf.team === t ? ' active' : '');
+        b.textContent = CONFIG.TEAMS[t].name;
+        b.style.setProperty('--tcolor', CONFIG.TEAMS[t].color);
+        if (conf.team === t) b.style.background = CONFIG.TEAMS[t].color;
+        b.addEventListener('click', () => { conf.team = t; renderPlayerOptions(); });
+        teamSeg.appendChild(b);
+      }
+      row.appendChild(teamSeg);
+    }
+
     wrap.appendChild(row);
   }
+}
+
+/* ---- モードに応じてチーム関連の設定欄を出し分け ------------------- */
+function updateModeUI() {
+  const isTeam = setupState.mode === 'team';
+  document.querySelectorAll('.team-only').forEach(el => {
+    el.style.display = isTeam ? '' : 'none';
+  });
+  // 手動チーム設定欄はチーム戦＋手動のときのみ
+  const manualHint = document.getElementById('opt-teamcount-wrap');
+  if (manualHint) manualHint.style.display = isTeam ? '' : 'none';
+  renderPlayerOptions();
 }
 
 /* ---- ゲーム開始 --------------------------------------------------- */
@@ -92,8 +125,12 @@ function startGame() {
     size: setupState.size,
     obstacles: setupState.obstacles,
     allowRevisit: setupState.revisit === 'allow',
+    mode: setupState.mode,
+    teamMode: setupState.teamMode,
+    teamCount: setupState.teamCount,
+    friendlyFire: setupState.friendlyFire,
     players: setupState.players.slice(0, setupState.count)
-      .map(p => ({ isCPU: p.isCPU, difficulty: p.difficulty })),
+      .map(p => ({ isCPU: p.isCPU, difficulty: p.difficulty, team: p.team })),
   };
 
   // UIへ通知するフック（Step3でアニメーションを差し込む余地を残す）
@@ -112,12 +149,15 @@ function startGame() {
       const why = reason === 'bomb' ? '爆弾で命中' : '行動不能';
       UI.setStatus(`💥 プレイヤー${'①②③④'[p.order-1]} 脱落（${why}）`);
     },
-    onWin: (winner) => {
+    onWin: (result) => {
       UI.clearCpuTimer();
       Sound.stopBGM();   // 勝利ジングルを目立たせるためBGM停止
       UI.fxConfetti();
-      showOverlay('🏆 勝利！',
-        winner ? `プレイヤー${'①②③④'[winner.order-1]} の勝ち！` : '引き分け', true);
+      let msg;
+      if (result.type === 'team') msg = `${result.team.name}チームの勝利！`;
+      else if (result.type === 'player') msg = `プレイヤー${'①②③④'[result.player.order - 1]} の勝利！`;
+      else msg = '引き分け';
+      showOverlay('🏆 勝利！', msg, true);
     },
   };
 
@@ -159,6 +199,10 @@ window.addEventListener('DOMContentLoaded', () => {
   bindSegment('opt-se', v => setupState.se = (v === 'on'));
   bindSegment('opt-bgm', v => setupState.bgm = (v === 'on'));
   bindSegment('opt-cpudebug', v => setupState.cpuDebug = (v === 'on'));
+  bindSegment('opt-mode', v => { setupState.mode = v; updateModeUI(); });
+  bindSegment('opt-teammode', v => { setupState.teamMode = v; renderPlayerOptions(); });
+  bindSegment('opt-teamcount', v => { setupState.teamCount = parseInt(v, 10); renderPlayerOptions(); });
+  bindSegment('opt-ff', v => setupState.friendlyFire = (v === 'on'));
 
   // URLに ?cpudebug=1 が付いていればデバッグ表示を初期ONにする
   if (new URLSearchParams(location.search).get('cpudebug') === '1') {
@@ -168,6 +212,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   renderPlayerOptions();
+  updateModeUI(); // チーム関連欄の初期表示
 
   document.getElementById('start-btn').addEventListener('click', startGame);
 

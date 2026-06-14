@@ -135,7 +135,10 @@ const UI = {
       // 自分(人間)かCPUかを示すバッジ（どれが自分か一目で分かるように）
       const label = this.playerLabel(p, humanCount);
       const badge = `<span class="token-badge ${p.isCPU ? 'cpu' : 'you'}">${label}</span>`;
-      token.innerHTML = badge + stickFigureSVG(p.color, p.order);
+      // チーム戦：足元にチームカラーの帯を表示
+      const teamFlag = (g.settings.mode === 'team' && p.team != null)
+        ? `<span class="team-flag" style="background:${g.teams[p.team].color}"></span>` : '';
+      token.innerHTML = badge + stickFigureSVG(p.color, p.order) + teamFlag;
       // 直前と位置が変わったトークンは「ぴょこっ」と着地アニメ
       if (this.prevPos && this.prevPos[p.id] && this.prevPos[p.id] !== key(p.r, p.c)) {
         token.classList.add('moved');
@@ -197,16 +200,40 @@ const UI = {
     const humanCount = g.players.filter(p => !p.isCPU).length;
     const cur = g.currentPlayer;
     el.innerHTML = '';
-    for (const p of g.players) {
+
+    const makeChip = (p) => {
       const chip = document.createElement('div');
       chip.className = 'pchip';
       if (!p.alive) chip.classList.add('dead');
-      else if (p.id === cur.id) chip.classList.add('current'); // 手番を強調
+      else if (p.id === cur.id) chip.classList.add('current');
       chip.style.setProperty('--pcolor', p.color);
       chip.innerHTML =
         `<span class="pchip-face">${'①②③④'[p.order - 1]}</span>` +
         `<span class="pchip-label">${this.playerLabel(p, humanCount)}</span>`;
-      el.appendChild(chip);
+      return chip;
+    };
+
+    if (g.settings.mode === 'team') {
+      // チームごとにまとめて表示（チームカラー付き）
+      el.classList.add('team-mode');
+      for (const team of g.teams) {
+        const members = g.players.filter(p => p.team === team.id);
+        if (!members.length) continue;
+        const group = document.createElement('div');
+        group.className = 'team-group';
+        group.style.setProperty('--tcolor', team.color);
+        // 全滅したチームはグループごとにグレーアウト
+        if (!members.some(p => p.alive)) group.classList.add('team-dead');
+        const label = document.createElement('span');
+        label.className = 'team-name';
+        label.textContent = team.name + 'チーム';
+        group.appendChild(label);
+        for (const p of members) group.appendChild(makeChip(p));
+        el.appendChild(group);
+      }
+    } else {
+      el.classList.remove('team-mode');
+      for (const p of g.players) el.appendChild(makeChip(p));
     }
   },
 

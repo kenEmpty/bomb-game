@@ -17,7 +17,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="ボムサバイバル" />
 
-  <link rel="stylesheet" href="style.css?v=3" />
+  <link rel="stylesheet" href="style.css?v=4" />
 </head>
 <body>
   <!-- ===== 設定画面 ===== -->
@@ -44,10 +44,43 @@
         </div>
       </div>
 
-      <!-- Step2 で有効化されるCPU設定（プレイヤーごとに人間/CPUを選ぶ） -->
+      <div class="field">
+        <label>ゲームモード</label>
+        <div class="seg" id="opt-mode">
+          <button data-val="ffa" class="seg-btn active">個人戦</button>
+          <button data-val="team" class="seg-btn">チーム戦</button>
+        </div>
+      </div>
+
+      <div class="field team-only">
+        <label>チーム数</label>
+        <div class="seg" id="opt-teamcount">
+          <button data-val="2" class="seg-btn active">2</button>
+          <button data-val="3" class="seg-btn">3</button>
+          <button data-val="4" class="seg-btn">4</button>
+        </div>
+      </div>
+
+      <div class="field team-only">
+        <label>チーム編成</label>
+        <div class="seg" id="opt-teammode">
+          <button data-val="random" class="seg-btn active">ランダム</button>
+          <button data-val="manual" class="seg-btn">手動</button>
+        </div>
+      </div>
+
+      <!-- プレイヤーごとの 人間/CPU・難易度・(手動時)チーム を選ぶ -->
       <div class="field" id="opt-players-wrap">
         <label>各プレイヤー設定</label>
         <div id="opt-players"></div>
+      </div>
+
+      <div class="field team-only">
+        <label>味方攻撃（フレンドリーファイア）</label>
+        <div class="seg" id="opt-ff">
+          <button data-val="off" class="seg-btn active">OFF</button>
+          <button data-val="on" class="seg-btn">ON</button>
+        </div>
       </div>
 
       <div class="field">
@@ -128,11 +161,11 @@
   </div>
 
   <!-- 読み込み順：設定→ゲームロジック→UI→起動 -->
-  <script src="js/config.js?v=3"></script>
-  <script src="js/game.js?v=3"></script>
-  <script src="js/cpu.js?v=3"></script>
-  <script src="js/audio.js?v=3"></script>
-  <script src="js/ui.js?v=3"></script>
-  <script src="js/main.js?v=3"></script>
+  <script src="js/config.js?v=4"></script>
+  <script src="js/game.js?v=4"></script>
+  <script src="js/cpu.js?v=4"></script>
+  <script src="js/audio.js?v=4"></script>
+  <script src="js/ui.js?v=4"></script>
+  <script src="js/main.js?v=4"></script>
 </body>
 </html>

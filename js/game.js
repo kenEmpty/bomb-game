@@ -25,6 +25,15 @@ class Game {
       this.grid.push(new Array(this.cols).fill(CELL.NORMAL));
     }
 
+    // チーム定義（チーム戦のみ）。チーム数は settings.teamCount で可変。
+    this.teams = [];
+    if (settings.mode === 'team') {
+      const tc = settings.teamCount || 2;
+      for (let i = 0; i < tc; i++) {
+        this.teams.push({ id: i, name: CONFIG.TEAMS[i].name, color: CONFIG.TEAMS[i].color });
+      }
+    }
+
     this._setupPlayers();
     this._setupObstacles();
 
@@ -65,12 +74,39 @@ class Game {
         isCPU: conf.isCPU,
         difficulty: conf.difficulty,
         color: CONFIG.PLAYER_COLORS[i],
+        team: null,                  // 所属チーム（個人戦ではnull）
       });
     }
+
+    this._assignTeams();
 
     // 行動順だけをランダムに決定（先行プレイヤーが毎回同じにならないように）。
     // turnOrder には「これから手番が回る順」のプレイヤーIDが入る。
     this.turnOrder = shuffle(this.players.map(p => p.id));
+  }
+
+  // チーム分け（チーム戦のみ）。ランダム or 手動。
+  _assignTeams() {
+    if (this.settings.mode !== 'team') return;
+    const n = this.players.length;
+    const tc = this.settings.teamCount || 2;
+
+    if (this.settings.teamMode === 'random') {
+      // シャッフルした順に均等割り当て（毎ゲーム組み合わせが変わる）
+      const order = shuffle([...Array(n).keys()]);
+      order.forEach((pIdx, k) => { this.players[pIdx].team = k % tc; });
+    } else {
+      // 手動：設定で指定されたチーム（範囲外はクランプ）
+      for (let i = 0; i < n; i++) {
+        const t = this.settings.players[i].team ?? 0;
+        this.players[i].team = Math.max(0, Math.min(tc - 1, t));
+      }
+    }
+  }
+
+  // 2人が味方同士か（チーム戦のみ。個人戦では常にfalse）
+  areAllies(a, b) {
+    return this.settings.mode === 'team' && a.team === b.team;
   }
 
   // ランダム障害物の配置（ON時のみ）
@@ -146,6 +182,8 @@ class Game {
   // 爆弾を投げられる候補マス一覧（8方向 × 射程1〜MAX）
   getBombTargets() {
     const p = this.currentPlayer;
+    // 味方攻撃OFFのチーム戦では、味方のいるマスには投げられない
+    const protectAllies = this.settings.mode === 'team' && !this.settings.friendlyFire;
     const targets = [];
     for (const d of CONFIG.DIRS_8) {
       for (let dist = 1; dist <= CONFIG.BOMB_MAX_RANGE; dist++) {
@@ -153,6 +191,10 @@ class Game {
         const c = p.c + d.dc * dist;
         if (!this.inField(r, c)) continue;
         if (this.grid[r][c] === CELL.DESTROYED) continue; // 破壊済みマスには投げられない
+        if (protectAllies) {
+          const occ = this.playerAt(r, c);
+          if (occ && occ.id !== p.id && this.areAllies(occ, p)) continue; // 味方マスは除外
+        }
         targets.push({ r, c, dist });
       }
     }
@@ -271,12 +313,31 @@ class Game {
     if (this.hooks.onEliminate) this.hooks.onEliminate(player, reason);
   }
 
-  // 勝者が決まったらtrueを返す
+  // 生存しているチームID一覧（チーム戦のみ）
+  aliveTeams() {
+    return [...new Set(this.players.filter(p => p.alive).map(p => p.team))];
+  }
+
+  // 勝者が決まったらtrueを返す。勝敗確定時は onWin に結果オブジェクトを渡す。
+  //   個人戦: { type:'player'|'draw', player }
+  //   チーム戦: { type:'team'|'draw', team }
   _checkWin() {
+    if (this.settings.mode === 'team') {
+      const teams = this.aliveTeams();
+      if (teams.length <= 1) {
+        this.phase = PHASE.OVER;
+        const team = teams.length === 1 ? this.teams[teams[0]] : null;
+        if (this.hooks.onWin) this.hooks.onWin(team ? { type: 'team', team } : { type: 'draw' });
+        return true;
+      }
+      return false;
+    }
+
+    // 個人戦
     if (this.aliveCount <= 1) {
       this.phase = PHASE.OVER;
-      const winner = this.players.find(p => p.alive) || null;
-      if (this.hooks.onWin) this.hooks.onWin(winner);
+      const player = this.players.find(p => p.alive) || null;
+      if (this.hooks.onWin) this.hooks.onWin(player ? { type: 'player', player } : { type: 'draw' });
       return true;
     }
     return false;

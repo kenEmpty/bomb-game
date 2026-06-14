@@ -19,16 +19,20 @@ const CPU = {
 
   // 評価の重み。優先度が崩れないよう桁を大きく離してある。
   WEIGHTS: {
-    NEXT_ATTACK: 1000, // 優先度1：次の相手に撃たれる位置への大ペナルティ
-    MULTI_ATTACK: 150, // 優先度2：狙ってくる相手の数ぶんペナルティ
+    NEXT_ATTACK: 1000, // 優先度1：次の敵に撃たれる位置への大ペナルティ
+    MULTI_ATTACK: 150, // 優先度2：狙ってくる敵の数ぶんペナルティ
+    ALLY_TRAP: 200,    // チーム戦：味方を閉じ込める位置への大ペナルティ
     OWN_MOBILITY: 10,  // 優先度3：自分の逃げ道1マスごとに加点
-    OPP_MOBILITY: 2,   // 優先度4：相手の逃げ道1マスごとに減点
+    OPP_MOBILITY: 2,   // 優先度4：敵の逃げ道1マスごとに減点
+    ALLY_BLOCK: 20,    // チーム戦：味方の逃げ道を1つ塞ぐごとに減点
   },
 
   /* 爆弾の投げ先を決める。{r,c} を返す（必ず getBombTargets() の中から選ぶ） */
   decideBomb(game) {
     const self = game.currentPlayer;
-    const targets = game.getBombTargets();
+    // CPUは味方を攻撃しない（味方攻撃ONでも味方マスは候補から除外）
+    let targets = cpuBombTargets(game, self);
+    if (!targets.length) targets = game.getBombTargets(); // 万一の保険
 
     switch (self.difficulty) {
       case 'easy':
@@ -39,8 +43,8 @@ const CPU = {
 
       case 'normal':
       default: {
-        // 倒せる相手がいれば狙う
-        const kills = targets.filter(t => isEnemyAt(game, t.r, t.c, self.id));
+        // 倒せる敵がいれば狙う
+        const kills = targets.filter(t => isEnemyCell(game, t.r, t.c, self));
         if (kills.length) return cpuPick(kills);
         // いなければ自分の逃げ道を削らない安全な投擲
         return CPU._safeBomb(game, self, targets);
@@ -108,34 +112,47 @@ const CPU = {
     return CPU._plan.queue.shift();
   },
 
-  /* 終点(end)の評価。生存重視のスコアと内訳を返す（高いほど良い）。 */
+  /* 終点(end)の評価。生存重視のスコアと内訳を返す（高いほど良い）。
+   * チーム戦では脅威・標的は「敵チーム」のみとし、味方を塞がない/閉じ込めない。 */
   _evalEnd(game, end, self) {
-    const opponents = game.players.filter(p => p.alive && p.id !== self.id);
-    const next = nextAlivePlayer(game);
+    const enemies = enemiesOf(game, self);
+    const allies = alliesOf(game, self);
+    const nextEnemy = nextEnemyAttacker(game, self);
 
-    // この終点を「現在位置から」爆撃できる相手（爆弾は投擲→移動の順なので現在地が脅威）
-    const attackers = opponents.filter(p => canBombReach(p.r, p.c, end.r, end.c));
-    const nextCanAttack = !!next && canBombReach(next.r, next.c, end.r, end.c);
+    // この終点を「現在位置から」爆撃できる敵（爆弾は投擲→移動の順なので現在地が脅威）
+    const attackers = enemies.filter(p => canBombReach(p.r, p.c, end.r, end.c));
+    const nextCanAttack = !!nextEnemy && canBombReach(nextEnemy.r, nextEnemy.c, end.r, end.c);
 
     // 自分の逃げ道（終点からの移動可能マス数）
     const mob = mobility(game, end.r, end.c, self.id);
 
-    // 相手の逃げ道合計（自分が終点にいると隣接マスを1つ塞ぐ）
-    let oppMobSum = 0;
-    for (const p of opponents) {
+    // 敵の逃げ道合計（自分が終点にいると隣接マスを1つ塞ぐ＝減らせる）
+    let enemyMobSum = 0;
+    for (const p of enemies) {
       let m = mobility(game, p.r, p.c, p.id);
-      if (chebyshev(end.r, end.c, p.r, p.c) === 1) m -= 1; // 隣を塞ぐ
-      oppMobSum += Math.max(0, m);
+      if (chebyshev(end.r, end.c, p.r, p.c) === 1) m -= 1;
+      enemyMobSum += Math.max(0, m);
+    }
+
+    // 味方の逃げ道を塞がない／閉じ込めない
+    let allyBlock = 0, allyTrap = 0;
+    for (const a of allies) {
+      if (chebyshev(end.r, end.c, a.r, a.c) === 1 && cellFree(game, end.r, end.c, a.id)) {
+        allyBlock += 1; // 味方の逃げ道を1つ塞ぐ
+        if (mobility(game, a.r, a.c, a.id) - 1 <= 0) allyTrap += 1; // 味方を閉じ込める
+      }
     }
 
     const W = CPU.WEIGHTS;
     let score = 0;
-    if (nextCanAttack) score -= W.NEXT_ATTACK;   // 優先度1
-    score -= W.MULTI_ATTACK * attackers.length;  // 優先度2
-    score += W.OWN_MOBILITY * mob;               // 優先度3
-    score -= W.OPP_MOBILITY * oppMobSum;         // 優先度4
+    if (nextCanAttack) score -= W.NEXT_ATTACK;     // 優先度1：次の敵に撃たれない
+    score -= W.MULTI_ATTACK * attackers.length;    // 優先度2：複数の敵に狙われない
+    score -= W.ALLY_TRAP * allyTrap;               // 味方を閉じ込めない
+    score += W.OWN_MOBILITY * mob;                 // 優先度3：自分の逃げ道を多く
+    score -= W.OPP_MOBILITY * enemyMobSum;         // 優先度4：敵の逃げ道を減らす
+    score -= W.ALLY_BLOCK * allyBlock;             // 味方の逃げ道を塞がない
 
-    return { score, nextCanAttack, atkCount: attackers.length, mob, oppMobSum };
+    return { score, nextCanAttack, atkCount: attackers.length, mob, oppMobSum: enemyMobSum, allyBlock, allyTrap };
   },
 
   /* デバッグ用：終点ごとの評価値を保存し、コンソールにも出力 */
@@ -143,28 +160,34 @@ const CPU = {
     const cells = scored.map(s => ({
       r: s.end.r, c: s.end.c, score: Math.round(s.score),
       nextAtk: s.nextCanAttack, atk: s.atkCount, mob: s.mob, oppMob: s.oppMobSum,
+      allyBlock: s.allyBlock || 0, allyTrap: s.allyTrap || 0,
       chosen: s.end.r === chosen.end.r && s.end.c === chosen.end.c,
     }));
     CPU.lastEval = { id: self.id, order: self.order, cells };
     console.groupCollapsed(`[CPU debug] P${self.order} 移動先評価（${cells.length}候補, スコア最大=${Math.round(chosen.score)}）`);
     console.table(cells.map(c => ({
       行: c.r, 列: c.c, スコア: c.score, 次に撃たれる: c.nextAtk,
-      狙う敵数: c.atk, 自由度: c.mob, 敵自由度計: c.oppMob, 採用: c.chosen,
+      狙う敵数: c.atk, 自由度: c.mob, 敵自由度計: c.oppMob,
+      味方塞ぎ: c.allyBlock, 味方閉込: c.allyTrap, 採用: c.chosen,
     })));
     console.groupEnd();
   },
 
-  /* ---- Hard用の爆弾思考 ---- */
+  /* ---- Hard用の爆弾思考（チーム戦では敵チームのみ標的） ---- */
   _hardBomb(game, self, targets) {
-    // ① 倒せる相手（射程内に敵）→ 最も逃げ道の少ない弱った相手を優先
-    const kills = targets.filter(t => isEnemyAt(game, t.r, t.c, self.id));
+    // ① 倒せる敵 → 逃げ道の少ない敵を優先。さらに味方を脅かしている敵を優先（援護）
+    const kills = targets.filter(t => isEnemyCell(game, t.r, t.c, self));
     if (kills.length) {
-      return bestBy(kills, t => -mobility(game, t.r, t.c, self.id));
+      return bestBy(kills, t => {
+        const victim = game.playerAt(t.r, t.c);
+        let s = -mobility(game, t.r, t.c, victim.id);
+        if (threatensAlly(game, victim, self)) s += 5; // 味方を狙う敵を先に倒す
+        return s;
+      });
     }
 
-    // ② 相手の逃げ道を減らす：逃げ道が少ない敵の隣接マスを破壊する
-    const enemies = game.players
-      .filter(p => p.alive && p.id !== self.id)
+    // ② 敵の逃げ道を減らす：逃げ道が少ない敵の隣接マスを破壊する
+    const enemies = enemiesOf(game, self)
       .sort((a, b) => mobility(game, a.r, a.c, a.id) - mobility(game, b.r, b.c, b.id));
     for (const e of enemies) {
       const opts = targets.filter(t =>
@@ -217,10 +240,33 @@ function nearestEnemyDist(game, r, c, selfId) {
   return best === Infinity ? 99 : best;
 }
 
-// 指定マスに自分以外の生存プレイヤーがいるか
-function isEnemyAt(game, r, c, selfId) {
+// 指定マスに「敵」がいるか（チーム戦では味方を除外）
+function isEnemyCell(game, r, c, self) {
   const o = game.playerAt(r, c);
-  return !!o && o.id !== selfId;
+  return !!o && o.id !== self.id && !game.areAllies(o, self);
+}
+
+// 敵プレイヤー一覧（チーム戦では敵チームのみ。個人戦では自分以外全員）
+function enemiesOf(game, self) {
+  return game.players.filter(p => p.alive && p.id !== self.id && !game.areAllies(p, self));
+}
+
+// 味方プレイヤー一覧（個人戦では空。自分は含まない）
+function alliesOf(game, self) {
+  return game.players.filter(p => p.alive && p.id !== self.id && game.areAllies(p, self));
+}
+
+// この敵が self の味方を爆撃で脅かしているか（援護判断用）
+function threatensAlly(game, enemy, self) {
+  return alliesOf(game, self).some(a => canBombReach(enemy.r, enemy.c, a.r, a.c));
+}
+
+// CPUの爆弾候補（味方マスは常に除外＝CPUは味方を攻撃しない）
+function cpuBombTargets(game, self) {
+  return game.getBombTargets().filter(t => {
+    const occ = game.playerAt(t.r, t.c);
+    return !(occ && occ.id !== self.id && game.areAllies(occ, self));
+  });
 }
 
 // (fr,fc) から (tr,tc) を爆弾で狙えるか（8方向・射程1〜MAX。途中マスは飛び越える）
@@ -232,12 +278,13 @@ function canBombReach(fr, fc, tr, tc) {
   return dist >= 1 && dist <= CONFIG.BOMB_MAX_RANGE;
 }
 
-// 現在の手番プレイヤーの次に手番が来る生存プレイヤー（いなければnull）
-function nextAlivePlayer(game) {
+// 現在の手番プレイヤーの次に手番が来る「敵」プレイヤー（いなければnull）。
+// 爆弾で最初に狙ってくる脅威。味方はスキップする。
+function nextEnemyAttacker(game, self) {
   const n = game.turnOrder.length;
   for (let i = 1; i <= n; i++) {
     const p = game.players[game.turnOrder[(game.turnPtr + i) % n]];
-    if (p.alive && p.id !== game.currentPlayer.id) return p;
+    if (p.alive && p.id !== self.id && !game.areAllies(p, self)) return p;
   }
   return null;
 }
