@@ -17,7 +17,8 @@ const Sound = {
   bgmTimer: null,
   bgmStep: 0,
 
-  MASTER_VOL: 0.9,  // 全体音量
+  MASTER_VOL: 1.0,  // 全体音量（効果音を含む。デフォルトを少し大きめに）
+  BGM_VOL: 1.9,     // BGMの音量倍率（BGMだけ控えめなので個別に底上げ）
 
   /* AudioContext を用意（未生成なら作る） */
   ensure() {
@@ -185,8 +186,8 @@ const Sound = {
       if (!this.enabledBGM || !this.ctx) return;
       const t = this.ctx.currentTime + 0.02;
       const i = this.bgmStep % this.BGM_MELODY.length;
-      if (this.BGM_MELODY[i]) this._tone(this.BGM_MELODY[i], t, this.BGM_STEP_DUR * 0.9, 'triangle', 0.06);
-      if (this.BGM_BASS[i])   this._tone(this.BGM_BASS[i],   t, this.BGM_STEP_DUR * 1.8, 'sine', 0.08);
+      if (this.BGM_MELODY[i]) this._tone(this.BGM_MELODY[i], t, this.BGM_STEP_DUR * 0.9, 'triangle', 0.06 * this.BGM_VOL);
+      if (this.BGM_BASS[i])   this._tone(this.BGM_BASS[i],   t, this.BGM_STEP_DUR * 1.8, 'sine', 0.08 * this.BGM_VOL);
       this.bgmStep++;
     }, this.BGM_STEP_DUR * 1000);
   },
