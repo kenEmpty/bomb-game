@@ -11,7 +11,7 @@ const setupState = {
   obstacles: false,
   revisit: 'allow',
   se: true,        // 効果音（既定ON）
-  bgm: false,      // BGM（既定OFF）
+  bgm: true,       // BGM（既定ON）
   cpuDebug: false, // CPU評価デバッグ表示（既定OFF）
   mode: 'ffa',     // ゲームモード 'ffa'(個人戦) / 'team'(チーム戦)
   teamMode: 'random', // チーム編成 'random' / 'manual'
@@ -241,4 +241,11 @@ window.addEventListener('DOMContentLoaded', () => {
     hideOverlay();
     showScreen('setup-screen');
   });
+
+  // Service Worker 登録（完全オフライン対応。https/localhostでのみ動作）
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
 });

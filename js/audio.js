@@ -17,8 +17,8 @@ const Sound = {
   bgmTimer: null,
   bgmStep: 0,
 
-  MASTER_VOL: 1.0,  // 全体音量（効果音を含む。デフォルトを少し大きめに）
-  BGM_VOL: 1.9,     // BGMの音量倍率（BGMだけ控えめなので個別に底上げ）
+  MASTER_VOL: 1.4,  // 全体音量（効果音を含む。リミッターで割れを抑えつつ大きめに）
+  BGM_VOL: 3.0,     // BGMの音量倍率（BGMだけ控えめなので個別に底上げ）
 
   /* AudioContext を用意（未生成なら作る） */
   ensure() {
@@ -28,7 +28,15 @@ const Sound = {
     this.ctx = new AC();
     this.master = this.ctx.createGain();
     this.master.gain.value = this.muted ? 0 : this.MASTER_VOL;
-    this.master.connect(this.ctx.destination);
+    // リミッター（コンプレッサー）：音量を上げても歪みにくくする
+    const comp = this.ctx.createDynamicsCompressor();
+    comp.threshold.value = -8;
+    comp.knee.value = 18;
+    comp.ratio.value = 8;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.25;
+    this.master.connect(comp);
+    comp.connect(this.ctx.destination);
   },
 
   /* モバイルの自動再生制限解除（「ゲーム開始」など操作時に呼ぶ） */
