@@ -251,12 +251,33 @@ html, body {
 }
 .cell.destroyed { background: var(--destroyed); }
 
-/* マス破壊アニメ（崩れて沈む） */
-.cell.breaking { animation: crumble 0.45s ease-out; }
+/* マス破壊アニメ（弾けて崩れ、穴になる） */
+.cell.breaking { animation: crumble 0.5s ease-out; }
 @keyframes crumble {
-  0%   { transform: scale(1); background: #ff9f43; }
-  40%  { transform: scale(1.12) rotate(3deg); background: var(--accent); }
-  100% { transform: scale(1); background: var(--destroyed); }
+  0%   { transform: scale(1);                 background: #ffd24a; }
+  25%  { transform: scale(1.14) rotate(3deg); background: #ff7a1a; }
+  55%  { transform: scale(0.86) rotate(-3deg); background: #3a2630; }
+  100% { transform: scale(1);                 background: var(--destroyed); }
+}
+
+/* 崩壊予定マス（移動中の開始マスを歩数に合わせて段階表示） */
+.cell.predict {
+  box-shadow: inset 0 0 0 2px rgba(255, 180, 80, 0.45);
+}
+.cell.predict-crack {
+  background-color: #34335a;
+  background-image:
+    linear-gradient(48deg, transparent 46%, rgba(0, 0, 0, 0.6) 47%, transparent 50%),
+    linear-gradient(-18deg, transparent 60%, rgba(0, 0, 0, 0.5) 61%, transparent 64%);
+}
+.cell.predict-collapse {
+  background-color: #20203a;
+  background-image:
+    linear-gradient(48deg, transparent 42%, rgba(0, 0, 0, 0.75) 44%, transparent 52%),
+    linear-gradient(-18deg, transparent 55%, rgba(0, 0, 0, 0.65) 57%, transparent 66%),
+    linear-gradient(100deg, transparent 48%, rgba(0, 0, 0, 0.5) 49%, transparent 53%);
+  transform: scale(0.9);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.85);
 }
 
 /* ハイライト */
@@ -343,15 +364,49 @@ html, body {
 }
 @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
 
-/* 爆発 */
-.fx-explode {
-  font-size: 2rem;
-  animation: explode 0.5s ease-out forwards;
+/* === 爆発エフェクト（軽量：transform/opacity のみ） === */
+/* 閃光 */
+.fx-flash {
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,240,0.95) 0%, rgba(255,220,150,0.6) 40%, rgba(255,150,80,0) 70%);
+  animation: fx-flash-anim ease-out forwards;
 }
-@keyframes explode {
-  0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
-  30%  { transform: translate(-50%, -50%) scale(1.4); opacity: 1; }
-  100% { transform: translate(-50%, -50%) scale(2.0); opacity: 0; }
+@keyframes fx-flash-anim {
+  0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.3); opacity: 0; }
+}
+/* 火球コア */
+.fx-core {
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, #ffd24a 35%, #ff7a1a 70%, rgba(255,80,0,0) 100%);
+  animation: fx-core-anim ease-out forwards;
+}
+@keyframes fx-core-anim {
+  0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
+  60%  { opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+}
+/* 爆風リング */
+.fx-ring {
+  border-radius: 50%;
+  border: 3px solid rgba(255, 200, 120, 0.9);
+  animation: fx-ring-anim cubic-bezier(.1,.7,.3,1) forwards;
+}
+@keyframes fx-ring-anim {
+  0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 0.9; border-width: 4px; }
+  100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; border-width: 1px; }
+}
+/* 火花パーティクル（飛行は JS の transition で制御） */
+.fx-spark {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: radial-gradient(circle, #fff, #ffd24a 60%, #ff8a1a);
+  box-shadow: 0 0 6px #ffb347;
+}
+/* 破片パーティクル */
+.fx-debris {
+  width: 7px; height: 7px; border-radius: 2px;
+  background: #4a4a78;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
 }
 
 /* 脱落テキスト（浮き上がって消える） */
@@ -362,10 +417,30 @@ html, body {
   text-shadow: 0 0 6px #000, 0 0 3px var(--accent);
   animation: ko 0.9s ease-out forwards;
 }
+.fx-ko.big { font-size: 1.8rem; text-shadow: 0 0 10px #000, 0 0 6px var(--accent); }
 @keyframes ko {
   0%   { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
   25%  { transform: translate(-50%, -120%) scale(1.3); opacity: 1; }
   100% { transform: translate(-50%, -260%) scale(1); opacity: 0; }
+}
+
+/* === 画面シェイク（撃破時のみ） === */
+.shake { animation: shake-anim 0.22s ease-in-out; }
+.shake-strong { animation: shake-anim-strong 0.4s ease-in-out; }
+@keyframes shake-anim {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-4px, 2px); }
+  40% { transform: translate(4px, -2px); }
+  60% { transform: translate(-3px, 2px); }
+  80% { transform: translate(3px, -1px); }
+}
+@keyframes shake-anim-strong {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  12% { transform: translate(-9px, 5px) rotate(-0.6deg); }
+  28% { transform: translate(9px, -5px) rotate(0.6deg); }
+  44% { transform: translate(-7px, -4px) rotate(-0.4deg); }
+  62% { transform: translate(7px, 5px) rotate(0.4deg); }
+  80% { transform: translate(-4px, -2px) rotate(-0.2deg); }
 }
 
 /* 勝利の紙吹雪 */

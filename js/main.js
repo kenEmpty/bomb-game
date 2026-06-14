@@ -151,13 +151,16 @@ function startGame() {
     },
     onWin: (result) => {
       UI.clearCpuTimer();
-      Sound.stopBGM();   // 勝利ジングルを目立たせるためBGM停止
-      UI.fxConfetti();
       let msg;
       if (result.type === 'team') msg = `${result.team.name}チームの勝利！`;
       else if (result.type === 'player') msg = `プレイヤー${'①②③④'[result.player.order - 1]} の勝利！`;
       else msg = '引き分け';
-      showOverlay('🏆 勝利！', msg, true);
+      // 最終撃破の演出（大爆発→シェイク→0.5s静止）後に勝利画面を出す
+      UI.scheduleWin(() => {
+        Sound.stopBGM();   // 勝利ジングルを目立たせるためBGM停止
+        UI.fxConfetti();
+        showOverlay('🏆 勝利！', msg, true);
+      });
     },
   };
 

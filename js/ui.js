@@ -26,6 +26,8 @@ const UI = {
       for (let c = 0; c < game.cols; c++)
         if (game.grid[r][c] === CELL.DESTROYED) this.prevDestroyed.add(key(r, c));
     for (const p of game.players) this.prevPos[p.id] = key(p.r, p.c);
+    this.finalKillInProgress = false; // 最終撃破シーケンス状態をリセット
+    this._winPresent = null;
     this.lockInput(400); // 開始ボタンの貫通タップで初手を誤爆しないように
     this.refresh();
   },
@@ -117,7 +119,7 @@ const UI = {
       for (let c = 0; c < g.cols; c++) {
         const cell = this.cellEl(r, c);
         cell.classList.toggle('destroyed', g.grid[r][c] === CELL.DESTROYED);
-        cell.classList.remove('hl-bomb', 'hl-move');
+        cell.classList.remove('hl-bomb', 'hl-move', 'predict', 'predict-crack', 'predict-collapse');
         cell.innerHTML = '';
       }
     }
@@ -156,6 +158,19 @@ const UI = {
           cell.classList.add('breaking');
           setTimeout(() => cell.classList.remove('breaking'), 500 / CONFIG.ANIM_SPEED);
         }
+      }
+    }
+
+    // 崩壊予定マス：移動フェーズ中、開始マスを歩数に合わせて段階表示する。
+    // （内部ルールは変更せず、正式な破壊は3歩完了時の _finishMove のまま）
+    //   移動開始(3歩残) → 予定 / 1歩完了(2歩残) → ヒビ / 2歩完了(1歩残) → 崩壊
+    if (g.phase === PHASE.MOVE && g.startCell &&
+        g.grid[g.startCell.r][g.startCell.c] !== CELL.DESTROYED) {
+      const sc = this.cellEl(g.startCell.r, g.startCell.c);
+      if (sc) {
+        if (g.movesLeft >= 3) sc.classList.add('predict');
+        else if (g.movesLeft === 2) sc.classList.add('predict-crack');
+        else if (g.movesLeft === 1) sc.classList.add('predict-collapse');
       }
     }
 
@@ -280,36 +295,104 @@ const UI = {
     return el;
   },
 
-  // 爆弾投擲：投げた人→着弾マスへ飛ばし、着弾で爆発。命中時はKO演出も
+  // 爆弾投擲：投げた人→着弾マスへ飛ばし、着弾で爆発。命中時はシェイク＋KO演出も。
   fxThrow(thrower, target, victim) {
+    const g = this.game;
+    // この命中で決着するか（victim脱落済みなので生存状況で判定）。onWinより前に確定させる。
+    const over = g.settings.mode === 'team' ? g.aliveTeams().length <= 1 : g.aliveCount <= 1;
+    const isFinal = !!victim && over;
+    if (isFinal) this.finalKillInProgress = true; // onWin に即時表示させない
+
     const from = this.cellCenter(thrower.r, thrower.c);
     const to = this.cellCenter(target.r, target.c);
     const dur = 380 / CONFIG.ANIM_SPEED;
     const bomb = this.spawnFx('fx-bomb', '💣', from.x, from.y, dur + 50);
     Sound.play('throw');
-    // 次フレームで目標へ移動（CSS transition で飛行）
     requestAnimationFrame(() => {
       bomb.style.transitionDuration = dur + 'ms';
       bomb.style.left = to.x + 'px';
       bomb.style.top = to.y + 'px';
     });
+
     setTimeout(() => {
-      this.fxExplode(target.r, target.c);
-      if (victim) this.fxKO(target.r, target.c);
+      const intensity = isFinal ? 2 : (victim ? 1 : 0);
+      this.fxExplode(target.r, target.c, intensity);
+      Sound.play(isFinal ? 'boomBig' : (victim ? 'boom' : 'explode'));
+
+      if (victim) {
+        // 撃破：爆発 → シェイク → 脱落演出（通常破壊ではシェイクしない）
+        this.shake(isFinal ? 'strong' : 'normal');
+        this.fxKO(target.r, target.c, isFinal);
+        if (isFinal) {
+          // 強シェイク(0.4s) → 0.5s静止 → 勝利画面
+          setTimeout(() => this._runWin(), 400 + 500);
+        }
+      }
     }, dur);
   },
 
-  // 爆発エフェクト
-  fxExplode(r, c) {
+  // 爆発エフェクト（閃光・爆風リング・コア・火花・破片）。intensity:0通常 1撃破 2最終
+  fxExplode(r, c, intensity = 0) {
     const p = this.cellCenter(r, c);
-    this.spawnFx('fx-explode', '💥', p.x, p.y, 600 / CONFIG.ANIM_SPEED);
-    Sound.play('explode');
+    const cell = this.cellEl(r, c);
+    const size = cell ? cell.getBoundingClientRect().width : 30;
+    const scale = 1 + intensity * 0.35;
+    this._burst('fx-flash', p.x, p.y, size * 2.0 * scale, 300); // 閃光
+    this._burst('fx-ring', p.x, p.y, size * 1.1 * scale, 500);  // 爆風リング
+    this._burst('fx-core', p.x, p.y, size * 1.1 * scale, 360);  // 火球コア
+    const sparks = 7 + intensity * 3;
+    for (let i = 0; i < sparks; i++) this._particle('fx-spark', p.x, p.y, size, scale, false);
+    const debris = 5 + intensity * 2;
+    for (let i = 0; i < debris; i++) this._particle('fx-debris', p.x, p.y, size, scale, true);
+  },
+
+  // CSSアニメで弾ける円形エフェクト（閃光・リング・コア）
+  _burst(cls, x, y, d, life) {
+    const el = document.createElement('div');
+    el.className = 'fx ' + cls;
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+    el.style.width = d + 'px'; el.style.height = d + 'px';
+    el.style.animationDuration = (life / CONFIG.ANIM_SPEED) + 'ms';
+    this.boardEl.appendChild(el);
+    setTimeout(() => el.remove(), life / CONFIG.ANIM_SPEED + 60);
+  },
+
+  // 中心から飛び散るパーティクル（火花/破片）。transformのみで軽量。
+  _particle(cls, x, y, size, scale, gravity) {
+    const el = document.createElement('div');
+    el.className = 'fx ' + cls;
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+    this.boardEl.appendChild(el);
+    const ang = Math.random() * Math.PI * 2;
+    const dist = size * (0.6 + Math.random() * 1.1) * scale;
+    const dx = Math.cos(ang) * dist;
+    let dy = Math.sin(ang) * dist;
+    if (gravity) dy += size * (0.4 + Math.random() * 0.8); // 破片は落下
+    const rot = (Math.random() * 720 - 360) | 0;
+    const dur = (gravity ? 520 : 420) / CONFIG.ANIM_SPEED;
+    requestAnimationFrame(() => {
+      el.style.transition = `transform ${dur}ms cubic-bezier(.15,.6,.3,1), opacity ${dur}ms ease-out`;
+      el.style.transform = `translate(-50%,-50%) translate(${dx}px,${dy}px) rotate(${rot}deg)`;
+      el.style.opacity = '0';
+    });
+    setTimeout(() => el.remove(), dur + 60);
+  },
+
+  // 画面シェイク（撃破時のみ使用）。strength: 'normal'(~0.2s) / 'strong'(~0.4s)
+  shake(strength) {
+    const el = document.getElementById('board-wrap');
+    if (!el) return;
+    const cls = strength === 'strong' ? 'shake-strong' : 'shake';
+    el.classList.remove('shake', 'shake-strong');
+    void el.offsetWidth; // リフローでアニメ再始動
+    el.classList.add(cls);
+    setTimeout(() => el.classList.remove(cls), (strength === 'strong' ? 420 : 230));
   },
 
   // 脱落（爆弾命中）演出
-  fxKO(r, c) {
+  fxKO(r, c, big) {
     const p = this.cellCenter(r, c);
-    this.spawnFx('fx-ko', 'OUT!', p.x, p.y, 900 / CONFIG.ANIM_SPEED);
+    this.spawnFx('fx-ko' + (big ? ' big' : ''), big ? 'K.O.!!' : 'OUT!', p.x, p.y, 1000 / CONFIG.ANIM_SPEED);
     Sound.play('ko');
   },
 
@@ -318,6 +401,19 @@ const UI = {
     const p = this.cellCenter(r, c);
     this.spawnFx('fx-ko', '💨 OUT', p.x, p.y, 900 / CONFIG.ANIM_SPEED);
     Sound.play('ko');
+  },
+
+  /* ---- 勝利画面の表示タイミング制御 -------------------------------- *
+   * 最終撃破時は「大爆発→強シェイク→脱落→0.5s静止」の後に表示する。
+   * onWin から渡された表示関数を、シーケンス完了まで保留する。 */
+  scheduleWin(presentFn) {
+    this._winPresent = presentFn;
+    if (this.finalKillInProgress) return; // fxThrow 側のシーケンスが後で _runWin を呼ぶ
+    setTimeout(() => this._runWin(), 500); // 通常決着（行動不能など）は少し待って表示
+  },
+  _runWin() {
+    this.finalKillInProgress = false;
+    if (this._winPresent) { const f = this._winPresent; this._winPresent = null; f(); }
   },
 
   // 勝利演出：画面上部から紙吹雪を降らせる

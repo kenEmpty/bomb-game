@@ -97,19 +97,9 @@ const Sound = {
         o.start(t); o.stop(t + 0.18);
         break;
       }
-      case 'explode': { // 爆発：ノイズ＋ローパスで減衰
-        const src = this._noise(0.5);
-        const lp = ctx.createBiquadFilter();
-        lp.type = 'lowpass';
-        lp.frequency.setValueAtTime(1400, t);
-        lp.frequency.exponentialRampToValueAtTime(120, t + 0.4);
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0.9, t);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-        src.connect(lp); lp.connect(g); g.connect(this.master);
-        src.start(t); src.stop(t + 0.5);
-        break;
-      }
+      case 'explode':  this._boom(0); break; // 通常の地形破壊
+      case 'boom':     this._boom(1); break; // プレイヤー撃破（少し大きめ）
+      case 'boomBig':  this._boom(2); break; // 最終撃破（大爆発）
       case 'step': // 移動：短いクリック
         this._tone(520, t, 0.06, 'square', 0.12);
         break;
@@ -133,6 +123,51 @@ const Sound = {
         notes.forEach((f, i) => this._tone(f, t + i * 0.12, 0.3, 'triangle', 0.3));
         break;
       }
+    }
+  },
+
+  /* 爆発音「ドーン/ボーン」。intensity: 0=通常 1=撃破 2=最終撃破 */
+  _boom(intensity) {
+    if (!this.enabledSE || !this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const dur = [0.45, 0.6, 0.85][intensity];
+    const vol = [0.8, 1.0, 1.0][intensity];
+
+    // 破裂音（ホワイトノイズ＋ローパス掃引）
+    const src = this._noise(dur * 0.7);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(1800, t);
+    lp.frequency.exponentialRampToValueAtTime(120, t + dur * 0.5);
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(vol, t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.7);
+    src.connect(lp); lp.connect(ng); ng.connect(this.master);
+    src.start(t); src.stop(t + dur * 0.7);
+
+    // 低音の「ドーン」（サイン下降）
+    const f0 = [150, 130, 120][intensity], f1 = [45, 38, 30][intensity];
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(vol * 0.9, t + 0.02);
+    og.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(og); og.connect(this.master);
+    o.start(t); o.stop(t + dur + 0.05);
+
+    // 撃破時はサブ低音を重ねて厚みを出す
+    if (intensity > 0) {
+      const o2 = ctx.createOscillator(); o2.type = 'triangle';
+      o2.frequency.setValueAtTime(f0 / 2, t);
+      o2.frequency.exponentialRampToValueAtTime(f1 / 2, t + dur);
+      const o2g = ctx.createGain();
+      o2g.gain.setValueAtTime(0.0001, t);
+      o2g.gain.exponentialRampToValueAtTime(vol * 0.5, t + 0.03);
+      o2g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o2.connect(o2g); o2g.connect(this.master);
+      o2.start(t); o2.stop(t + dur + 0.05);
     }
   },
 
