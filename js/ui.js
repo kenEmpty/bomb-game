@@ -315,20 +315,23 @@ const UI = {
     });
 
     setTimeout(() => {
-      const intensity = isFinal ? 2 : (victim ? 1 : 0);
-      this.fxExplode(target.r, target.c, intensity);
-      Sound.play(isFinal ? 'boomBig' : (victim ? 'boom' : 'explode'));
-
       if (victim) {
-        // 撃破：爆発 → シェイク → 脱落演出（通常破壊ではシェイクしない）
-        this.shake(isFinal ? 'strong' : 'normal');
-        this.fxKO(target.r, target.c, isFinal);
-        if (isFinal) {
-          // 強シェイク(0.4s) → 0.5s静止 → 勝利画面
-          setTimeout(() => this._runWin(), 400 + 500);
-        }
+        this.fxKill(target.r, target.c, isFinal); // 撃破演出（爆発＋シェイク＋KO）
+      } else {
+        this.fxExplode(target.r, target.c, 0);    // 通常の地形破壊（シェイク無し）
+        Sound.play('explode');
       }
     }, dur);
+  },
+
+  /* プレイヤー撃破の共通演出：爆発 → シェイク → KO。最終なら大爆発＋強シェイク後に勝利画面。
+   * 爆弾命中・行動不能（投げ場/移動先なし）どちらの脱落でも使う。 */
+  fxKill(r, c, isFinal) {
+    this.fxExplode(r, c, isFinal ? 2 : 1);
+    Sound.play(isFinal ? 'boomBig' : 'boom');
+    this.shake(isFinal ? 'strong' : 'normal');
+    this.fxKO(r, c, isFinal);
+    if (isFinal) setTimeout(() => this._runWin(), 400 + 500); // 強シェイク→0.5s静止→勝利
   },
 
   // 爆発エフェクト（閃光・爆風リング・コア・火花・破片）。intensity:0通常 1撃破 2最終
@@ -389,17 +392,10 @@ const UI = {
     setTimeout(() => el.classList.remove(cls), (strength === 'strong' ? 420 : 230));
   },
 
-  // 脱落（爆弾命中）演出
+  // 脱落テキスト（爆弾命中・行動不能 共通）
   fxKO(r, c, big) {
     const p = this.cellCenter(r, c);
     this.spawnFx('fx-ko' + (big ? ' big' : ''), big ? 'K.O.!!' : 'OUT!', p.x, p.y, 1000 / CONFIG.ANIM_SPEED);
-    Sound.play('ko');
-  },
-
-  // 行動不能で脱落した演出
-  fxStuck(r, c) {
-    const p = this.cellCenter(r, c);
-    this.spawnFx('fx-ko', '💨 OUT', p.x, p.y, 900 / CONFIG.ANIM_SPEED);
     Sound.play('ko');
   },
 

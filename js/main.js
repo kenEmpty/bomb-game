@@ -144,8 +144,14 @@ function startGame() {
     // 開始マス破壊：低い衝撃音
     onDestroyStart: () => Sound.play('thud'),
     onEliminate: (p, reason) => {
-      // 行動不能はその場で消滅演出（爆弾命中は fxThrow 側で演出）
-      if (reason === 'stuck') UI.fxStuck(p.r, p.c);
+      // 行動不能（投げ場/移動先なし）も爆弾撃破と同じ演出にする。
+      // 爆弾命中は fxThrow 側で演出するためここでは扱わない。
+      if (reason === 'stuck') {
+        const g = UI.game;
+        const over = g.settings.mode === 'team' ? g.aliveTeams().length <= 1 : g.aliveCount <= 1;
+        if (over) UI.finalKillInProgress = true; // onWin に即時表示させない
+        UI.fxKill(p.r, p.c, over);
+      }
       const why = reason === 'bomb' ? '爆弾で命中' : '行動不能';
       UI.setStatus(`💥 プレイヤー${'①②③④'[p.order-1]} 脱落（${why}）`);
     },
