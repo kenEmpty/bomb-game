@@ -10,8 +10,9 @@ const setupState = {
   count: 2,
   obstacles: false,
   revisit: 'allow',
-  se: true,    // 効果音（既定ON）
-  bgm: false,  // BGM（既定OFF）
+  se: true,        // 効果音（既定ON）
+  bgm: false,      // BGM（既定OFF）
+  cpuDebug: false, // CPU評価デバッグ表示（既定OFF）
   // 各プレイヤーの human/CPU 設定（Step2で本格使用）。既定は全員human。
   players: [
     { isCPU: false, difficulty: 'normal' },
@@ -125,6 +126,11 @@ function startGame() {
   Sound.setSE(setupState.se);
   Sound.setBGM(setupState.bgm);
 
+  // CPUデバッグ表示の有効化（毎ゲーム状態をリセット）
+  CPU.debug = setupState.cpuDebug;
+  CPU.lastEval = null;
+  CPU._plan = null;
+
   game = new Game(settings, hooks);
   showScreen('game-screen');
   UI.init(game);
@@ -152,6 +158,14 @@ window.addEventListener('DOMContentLoaded', () => {
   bindSegment('opt-revisit', v => setupState.revisit = v);
   bindSegment('opt-se', v => setupState.se = (v === 'on'));
   bindSegment('opt-bgm', v => setupState.bgm = (v === 'on'));
+  bindSegment('opt-cpudebug', v => setupState.cpuDebug = (v === 'on'));
+
+  // URLに ?cpudebug=1 が付いていればデバッグ表示を初期ONにする
+  if (new URLSearchParams(location.search).get('cpudebug') === '1') {
+    setupState.cpuDebug = true;
+    const seg = document.getElementById('opt-cpudebug');
+    seg.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'on'));
+  }
 
   renderPlayerOptions();
 

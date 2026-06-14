@@ -3,11 +3,28 @@
  * CPUの思考ルーチン。難易度ごとに「爆弾の投げ先」「1歩の移動先」を返す。
  *   Easy   … 完全ランダム
  *   Normal … 閉じ込められない行動を優先（自分の逃げ道を確保）
- *   Hard   … ①倒せる相手を倒す ②相手の逃げ道を減らす ③自分の安全地帯を確保
+ *   Hard   … 移動は3歩先まで全列挙し、終点の「生存率」を重視して選ぶ。
+ *            評価の優先度（高い順）：
+ *              1. 次に手番が来る相手から爆弾で狙われる位置を避ける
+ *              2. 複数の相手から狙われる位置を避ける
+ *              3. 自分の移動可能マス数（逃げ道）が多い位置を優先
+ *              4. 相手の移動可能マス数を減らす位置を優先
  * 純粋な判断のみを行い、実際の実行（待ち時間・描画）は ui.js が担当する。
  * ========================================================================= */
 
 const CPU = {
+  debug: false,    // CPU評価値のデバッグ表示（main.jsの設定で切替）
+  lastEval: null,  // 直近のHard移動評価（UIがデバッグ描画に使う）
+  _plan: null,     // Hardの移動計画（1ターン分の経路）
+
+  // 評価の重み。優先度が崩れないよう桁を大きく離してある。
+  WEIGHTS: {
+    NEXT_ATTACK: 1000, // 優先度1：次の相手に撃たれる位置への大ペナルティ
+    MULTI_ATTACK: 150, // 優先度2：狙ってくる相手の数ぶんペナルティ
+    OWN_MOBILITY: 10,  // 優先度3：自分の逃げ道1マスごとに加点
+    OPP_MOBILITY: 2,   // 優先度4：相手の逃げ道1マスごとに減点
+  },
+
   /* 爆弾の投げ先を決める。{r,c} を返す（必ず getBombTargets() の中から選ぶ） */
   decideBomb(game) {
     const self = game.currentPlayer;
@@ -42,16 +59,99 @@ const CPU = {
         return cpuPick(targets);
 
       case 'hard':
-        // 逃げ道(機動力)が多く、かつ敵から遠い安全地帯を選ぶ
-        return bestBy(targets, t =>
-          mobility(game, t.r, t.c, self.id) * 2 +
-          Math.min(nearestEnemyDist(game, t.r, t.c, self.id), 4));
+        return CPU._hardStep(game, self, targets);
 
       case 'normal':
       default:
         // 移動後に最も逃げ道が多いマスを選ぶ（閉じ込められ回避）
         return bestBy(targets, t => mobility(game, t.r, t.c, self.id));
     }
+  },
+
+  /* ---- Hardの移動：3歩先まで先読みして生存重視で1歩を返す ---- */
+  _hardStep(game, self, targets) {
+    // すでに今ターンの計画があり、残り歩数と一致していればそれを踏襲する
+    if (CPU._plan && CPU._plan.id === self.id && CPU._plan.queue.length === game.movesLeft) {
+      const next = CPU._plan.queue.shift();
+      if (targets.some(t => t.r === next.r && t.c === next.c)) return next;
+      // 想定外なら作り直す（保険）
+    }
+
+    // 残り movesLeft 歩で到達できる「終点」を全列挙
+    const paths = enumeratePaths(game, self);
+    if (!paths.length) return cpuPick(targets); // 念のため
+
+    // 終点が同じ経路は1つにまとめる
+    const uniq = new Map();
+    for (const p of paths) {
+      const k = key(p.end.r, p.end.c);
+      if (!uniq.has(k)) uniq.set(k, p);
+    }
+
+    // 各終点を生存重視で評価
+    const scored = [...uniq.values()].map(p => {
+      const e = CPU._evalEnd(game, p.end, self);
+      return { path: p.path, end: p.end, ...e };
+    });
+
+    // 最良スコア（同点はランダム）
+    let best = -Infinity, pool = [];
+    for (const s of scored) {
+      if (s.score > best) { best = s.score; pool = [s]; }
+      else if (s.score === best) pool.push(s);
+    }
+    const chosen = cpuPick(pool);
+    CPU._plan = { id: self.id, queue: chosen.path.slice() };
+
+    if (CPU.debug) CPU._recordDebug(self, scored, chosen);
+
+    return CPU._plan.queue.shift();
+  },
+
+  /* 終点(end)の評価。生存重視のスコアと内訳を返す（高いほど良い）。 */
+  _evalEnd(game, end, self) {
+    const opponents = game.players.filter(p => p.alive && p.id !== self.id);
+    const next = nextAlivePlayer(game);
+
+    // この終点を「現在位置から」爆撃できる相手（爆弾は投擲→移動の順なので現在地が脅威）
+    const attackers = opponents.filter(p => canBombReach(p.r, p.c, end.r, end.c));
+    const nextCanAttack = !!next && canBombReach(next.r, next.c, end.r, end.c);
+
+    // 自分の逃げ道（終点からの移動可能マス数）
+    const mob = mobility(game, end.r, end.c, self.id);
+
+    // 相手の逃げ道合計（自分が終点にいると隣接マスを1つ塞ぐ）
+    let oppMobSum = 0;
+    for (const p of opponents) {
+      let m = mobility(game, p.r, p.c, p.id);
+      if (chebyshev(end.r, end.c, p.r, p.c) === 1) m -= 1; // 隣を塞ぐ
+      oppMobSum += Math.max(0, m);
+    }
+
+    const W = CPU.WEIGHTS;
+    let score = 0;
+    if (nextCanAttack) score -= W.NEXT_ATTACK;   // 優先度1
+    score -= W.MULTI_ATTACK * attackers.length;  // 優先度2
+    score += W.OWN_MOBILITY * mob;               // 優先度3
+    score -= W.OPP_MOBILITY * oppMobSum;         // 優先度4
+
+    return { score, nextCanAttack, atkCount: attackers.length, mob, oppMobSum };
+  },
+
+  /* デバッグ用：終点ごとの評価値を保存し、コンソールにも出力 */
+  _recordDebug(self, scored, chosen) {
+    const cells = scored.map(s => ({
+      r: s.end.r, c: s.end.c, score: Math.round(s.score),
+      nextAtk: s.nextCanAttack, atk: s.atkCount, mob: s.mob, oppMob: s.oppMobSum,
+      chosen: s.end.r === chosen.end.r && s.end.c === chosen.end.c,
+    }));
+    CPU.lastEval = { id: self.id, order: self.order, cells };
+    console.groupCollapsed(`[CPU debug] P${self.order} 移動先評価（${cells.length}候補, スコア最大=${Math.round(chosen.score)}）`);
+    console.table(cells.map(c => ({
+      行: c.r, 列: c.c, スコア: c.score, 次に撃たれる: c.nextAtk,
+      狙う敵数: c.atk, 自由度: c.mob, 敵自由度計: c.oppMob, 採用: c.chosen,
+    })));
+    console.groupEnd();
   },
 
   /* ---- Hard用の爆弾思考 ---- */
@@ -80,10 +180,8 @@ const CPU = {
 
   /* 自分の隣接マス（＝逃げ道）を壊さない、効果のある投擲先を選ぶ */
   _safeBomb(game, self, targets) {
-    // 効果のある通常マスを優先
     let pool = targets.filter(t => game.grid[t.r][t.c] === CELL.NORMAL);
     if (!pool.length) pool = targets;
-    // 自分から離れた（隣接でない）マスを優先
     const far = pool.filter(t => chebyshev(t.r, t.c, self.r, self.c) > 1);
     return cpuPick(far.length ? far : pool);
   },
@@ -123,6 +221,60 @@ function nearestEnemyDist(game, r, c, selfId) {
 function isEnemyAt(game, r, c, selfId) {
   const o = game.playerAt(r, c);
   return !!o && o.id !== selfId;
+}
+
+// (fr,fc) から (tr,tc) を爆弾で狙えるか（8方向・射程1〜MAX。途中マスは飛び越える）
+function canBombReach(fr, fc, tr, tc) {
+  const dr = tr - fr, dc = tc - fc;
+  const adr = Math.abs(dr), adc = Math.abs(dc);
+  if (!(dr === 0 || dc === 0 || adr === adc)) return false; // 8方向以外は不可
+  const dist = Math.max(adr, adc);
+  return dist >= 1 && dist <= CONFIG.BOMB_MAX_RANGE;
+}
+
+// 現在の手番プレイヤーの次に手番が来る生存プレイヤー（いなければnull）
+function nextAlivePlayer(game) {
+  const n = game.turnOrder.length;
+  for (let i = 1; i <= n; i++) {
+    const p = game.players[game.turnOrder[(game.turnPtr + i) % n]];
+    if (p.alive && p.id !== game.currentPlayer.id) return p;
+  }
+  return null;
+}
+
+// 現在位置から「残り movesLeft 歩」で到達できる全経路を列挙（ゲームの移動規則に準拠）
+function enumeratePaths(game, self) {
+  const allowRevisit = game.settings.allowRevisit;
+  const results = [];
+  const baseVisited = new Set(game.visited);
+
+  function legalNeighbors(r, c, visited, movesLeftHere) {
+    const out = [];
+    for (const d of CONFIG.DIRS_8) {
+      const nr = r + d.dr, nc = c + d.dc;
+      if (!game.inField(nr, nc)) continue;
+      if (game.grid[nr][nc] === CELL.DESTROYED) continue;
+      const occ = game.playerAt(nr, nc);
+      if (occ && occ.id !== self.id) continue;       // 他プレイヤー（自分の元位置は空き扱い）
+      // 最後の1歩では開始マスに留まれない（移動後に破壊されるため）
+      if (movesLeftHere === 1 && nr === game.startCell.r && nc === game.startCell.c) continue;
+      if (!allowRevisit && visited.has(key(nr, nc))) continue; // 再訪禁止
+      out.push({ r: nr, c: nc });
+    }
+    return out;
+  }
+
+  function dfs(r, c, visited, remaining, path) {
+    if (remaining === 0) { results.push({ end: { r, c }, path }); return; }
+    for (const nb of legalNeighbors(r, c, visited, remaining)) {
+      let nv = visited;
+      if (!allowRevisit) { nv = new Set(visited); nv.add(key(nb.r, nb.c)); }
+      dfs(nb.r, nb.c, nv, remaining - 1, path.concat([nb]));
+    }
+  }
+
+  dfs(self.r, self.c, baseVisited, game.movesLeft, []);
+  return results;
 }
 
 // チェビシェフ距離（8方向の歩数）

@@ -39,6 +39,7 @@ const UI = {
   beginTurn() {
     const g = this.game;
     if (g.phase === PHASE.OVER) return;
+    if (typeof CPU !== 'undefined') CPU.lastEval = null; // 前ターンのデバッグ表示を消す
     this.refresh();
     this.updateStatusForPhase();
     if (g.currentPlayer.isCPU) this.runCpuTurn();
@@ -166,6 +167,20 @@ const UI = {
     this.renderRoster();
     this.renderSteps();
     this.renderHighlights();
+    this.renderCpuDebug();
+  },
+
+  /* CPU評価値のデバッグ表示（Hardの移動先候補にスコアを重ねる） */
+  renderCpuDebug() {
+    if (typeof CPU === 'undefined' || !CPU.debug || !CPU.lastEval) return;
+    for (const c of CPU.lastEval.cells) {
+      const el = this.cellEl(c.r, c.c);
+      if (!el) continue;
+      const tag = document.createElement('div');
+      tag.className = 'cpu-dbg' + (c.chosen ? ' chosen' : '') + (c.nextAtk ? ' danger' : '');
+      tag.textContent = c.score;
+      el.appendChild(tag);
+    }
   },
 
   // プレイヤーの表示ラベル（CPU / あなた / Px）

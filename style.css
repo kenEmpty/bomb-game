@@ -248,6 +248,26 @@ html, body {
 .cell.hl-bomb { background: var(--hl-bomb); box-shadow: inset 0 0 0 2px var(--accent); cursor: pointer; }
 .cell.hl-move { background: var(--hl-move); box-shadow: inset 0 0 0 2px #2ec4b6; cursor: pointer; }
 
+/* CPU評価デバッグ：移動先候補に重ねるスコア */
+.cpu-dbg {
+  position: absolute;
+  top: 1px; left: 2px;
+  z-index: 5;
+  font-size: 0.55rem;
+  font-weight: bold;
+  line-height: 1;
+  color: #cfe;
+  text-shadow: 0 0 2px #000, 0 0 2px #000;
+  pointer-events: none;
+}
+.cpu-dbg.danger { color: #ff6b6b; }          /* 次の相手に撃たれる位置 */
+.cpu-dbg.chosen {                            /* 実際に選んだ終点 */
+  color: #fff;
+  background: rgba(46, 196, 182, 0.85);
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
 /* プレイヤートークン */
 .token { width: 86%; height: 86%; pointer-events: none; position: relative; }
 .token .stick { width: 100%; height: 100%; display: block; }
