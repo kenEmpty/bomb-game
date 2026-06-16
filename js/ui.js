@@ -140,7 +140,7 @@ const UI = {
       // チーム戦：足元にチームカラーの帯を表示
       const teamFlag = (g.settings.mode === 'team' && p.team != null)
         ? `<span class="team-flag" style="background:${g.teams[p.team].color}"></span>` : '';
-      token.innerHTML = badge + stickFigureSVG(p.color, p.order) + teamFlag;
+      token.innerHTML = badge + SkinStore.getActiveDef().drawCharacter(p.color, p.order) + teamFlag;
       // 直前と位置が変わったトークンは「ぴょこっ」と着地アニメ
       if (this.prevPos && this.prevPos[p.id] && this.prevPos[p.id] !== key(p.r, p.c)) {
         token.classList.add('moved');
@@ -284,10 +284,10 @@ const UI = {
   },
 
   // 盤面に一時FX要素を追加（ms後に自動削除）
-  spawnFx(className, text, x, y, life) {
+  spawnFx(className, html, x, y, life) {
     const el = document.createElement('div');
     el.className = 'fx ' + className;
-    el.textContent = text;
+    el.innerHTML = html; // SVGや絵文字に対応（開発者定義の安全なHTML）
     el.style.left = x + 'px';
     el.style.top = y + 'px';
     this.boardEl.appendChild(el);
@@ -303,10 +303,13 @@ const UI = {
     const isFinal = !!victim && over;
     if (isFinal) this.finalKillInProgress = true; // onWin に即時表示させない
 
+    const skin = SkinStore.getActiveDef();
+    const proj = skin.projectile;
     const from = this.cellCenter(thrower.r, thrower.c);
     const to = this.cellCenter(target.r, target.c);
     const dur = 380 / CONFIG.ANIM_SPEED;
-    const bomb = this.spawnFx('fx-bomb', '💣', from.x, from.y, dur + 50);
+    const spinClass = proj.spin !== false ? '' : ' no-spin';
+    const bomb = this.spawnFx('fx-bomb' + spinClass, proj.html, from.x, from.y, dur + 50);
     Sound.play('throw');
     requestAnimationFrame(() => {
       bomb.style.transitionDuration = dur + 'ms';
@@ -336,35 +339,46 @@ const UI = {
 
   // 爆発エフェクト（閃光・爆風リング・コア・火花・破片）。intensity:0通常 1撃破 2最終
   fxExplode(r, c, intensity = 0) {
+    const theme = SkinStore.getActiveDef().explosionTheme;
     const p = this.cellCenter(r, c);
     const cell = this.cellEl(r, c);
     const size = cell ? cell.getBoundingClientRect().width : 30;
     const scale = 1 + intensity * 0.35;
-    this._burst('fx-flash', p.x, p.y, size * 2.0 * scale, 300); // 閃光
-    this._burst('fx-ring', p.x, p.y, size * 1.1 * scale, 500);  // 爆風リング
-    this._burst('fx-core', p.x, p.y, size * 1.1 * scale, 360);  // 火球コア
+    this._burst('fx-flash', p.x, p.y, size * 2.0 * scale, 300, theme?.flash);
+    this._burst('fx-ring',  p.x, p.y, size * 1.1 * scale, 500, null, theme?.ringColor);
+    this._burst('fx-core',  p.x, p.y, size * 1.1 * scale, 360, theme?.core);
     const sparks = 7 + intensity * 3;
-    for (let i = 0; i < sparks; i++) this._particle('fx-spark', p.x, p.y, size, scale, false);
+    for (let i = 0; i < sparks; i++) this._particle('fx-spark', p.x, p.y, size, scale, false, theme);
     const debris = 5 + intensity * 2;
-    for (let i = 0; i < debris; i++) this._particle('fx-debris', p.x, p.y, size, scale, true);
+    for (let i = 0; i < debris; i++) this._particle('fx-debris', p.x, p.y, size, scale, true, theme);
   },
 
   // CSSアニメで弾ける円形エフェクト（閃光・リング・コア）
-  _burst(cls, x, y, d, life) {
+  _burst(cls, x, y, d, life, bgOverride, borderOverride) {
     const el = document.createElement('div');
     el.className = 'fx ' + cls;
     el.style.left = x + 'px'; el.style.top = y + 'px';
     el.style.width = d + 'px'; el.style.height = d + 'px';
     el.style.animationDuration = (life / CONFIG.ANIM_SPEED) + 'ms';
+    if (bgOverride)     el.style.background   = bgOverride;
+    if (borderOverride) el.style.borderColor  = borderOverride;
     this.boardEl.appendChild(el);
     setTimeout(() => el.remove(), life / CONFIG.ANIM_SPEED + 60);
   },
 
   // 中心から飛び散るパーティクル（火花/破片）。transformのみで軽量。
-  _particle(cls, x, y, size, scale, gravity) {
+  _particle(cls, x, y, size, scale, gravity, theme) {
     const el = document.createElement('div');
     el.className = 'fx ' + cls;
     el.style.left = x + 'px'; el.style.top = y + 'px';
+    if (theme) {
+      if (cls === 'fx-spark' && theme.sparkBg) {
+        el.style.background = theme.sparkBg;
+        el.style.boxShadow  = `0 0 6px ${theme.sparkGlow || '#ffb347'}`;
+      } else if (cls === 'fx-debris' && theme.debrisBg) {
+        el.style.background = theme.debrisBg;
+      }
+    }
     this.boardEl.appendChild(el);
     const ang = Math.random() * Math.PI * 2;
     const dist = size * (0.6 + Math.random() * 1.1) * scale;
@@ -412,11 +426,11 @@ const UI = {
     if (this._winPresent) { const f = this._winPresent; this._winPresent = null; f(); }
   },
 
-  // 勝利演出：画面上部から紙吹雪を降らせる
+  // 勝利演出：アクティブスキンの絵文字で紙吹雪を降らせる
   fxConfetti() {
     Sound.play('win');
     const layer = document.getElementById('overlay');
-    const emojis = ['🎉', '🎊', '✨', '⭐', '💥'];
+    const emojis = SkinStore.getActiveDef().victoryEmojis || ['🎉', '🎊', '✨', '⭐', '💥'];
     for (let i = 0; i < 24; i++) {
       const c = document.createElement('div');
       c.className = 'confetti';

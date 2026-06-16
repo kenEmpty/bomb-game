@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="ボムサバイバル" />
 
-  <link rel="stylesheet" href="style.css?v=9" />
+  <link rel="stylesheet" href="style.css?v=10" />
 </head>
 <body>
   <!-- ===== 設定画面 ===== -->
@@ -129,7 +129,24 @@
       </details>
 
       <button id="start-btn" class="primary-btn">ゲーム開始</button>
+      <button id="shop-btn" class="ghost-btn">🎨 スキンショップ</button>
       <button id="guide-open-btn" class="ghost-btn">遊び方を見る</button>
+    </div>
+  </section>
+
+  <!-- ===== スキンショップ画面 ===== -->
+  <section id="shop-screen" class="screen">
+    <div class="shop-header">
+      <button id="shop-back-btn" class="icon-btn" title="戻る">←</button>
+      <h2 class="shop-title">スキンショップ</h2>
+      <div class="shop-pts-badge">
+        <span class="shop-pts-icon">⭐</span>
+        <span id="shop-points">0 pt</span>
+      </div>
+    </div>
+    <div class="shop-scroll">
+      <div class="shop-hint">ゲームで勝利・参加するとポイントが貯まります</div>
+      <div id="shop-grid"></div>
     </div>
   </section>
 
@@ -160,6 +177,9 @@
     <div class="overlay-card">
       <h2 id="overlay-title">メニュー</h2>
       <p id="overlay-msg"></p>
+
+      <!-- ポイント獲得表示（勝利時のみ） -->
+      <div id="overlay-pts" class="overlay-pts"></div>
 
       <!-- 勝利時のみ：結果サマリー -->
       <div id="overlay-summary"></div>
@@ -221,11 +241,13 @@
     </div>
   </div>
 
-  <script src="js/config.js?v=9"></script>
-  <script src="js/game.js?v=9"></script>
-  <script src="js/cpu.js?v=9"></script>
-  <script src="js/audio.js?v=9"></script>
-  <script src="js/ui.js?v=9"></script>
-  <script src="js/main.js?v=9"></script>
+  <script src="js/config.js?v=10"></script>
+  <script src="js/skins.js?v=10"></script>
+  <script src="js/shop.js?v=10"></script>
+  <script src="js/game.js?v=10"></script>
+  <script src="js/cpu.js?v=10"></script>
+  <script src="js/audio.js?v=10"></script>
+  <script src="js/ui.js?v=10"></script>
+  <script src="js/main.js?v=10"></script>
 </body>
 </html>

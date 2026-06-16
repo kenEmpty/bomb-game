@@ -6,6 +6,36 @@
 
 const STORAGE_KEY = 'bombgame-settings-v2';
 
+/* ---- ポイント獲得（ゲーム終了時） --------------------------------- */
+function awardMatchPoints(result) {
+  const humans = game.players.filter(p => !p.isCPU);
+  if (humans.length === 0) return 0;
+
+  const TABLES = {
+    easy:   { win: 3,  lose: 1 },
+    normal: { win: 5,  lose: 2 },
+    hard:   { win: 10, lose: 3 },
+  };
+
+  const cpuDiffs = game.players.filter(p => p.isCPU).map(p => p.difficulty);
+  let diff = 'normal';
+  if (cpuDiffs.includes('hard'))   diff = 'hard';
+  else if (cpuDiffs.includes('normal')) diff = 'normal';
+  else if (cpuDiffs.includes('easy'))   diff = 'easy';
+  const table = TABLES[diff];
+
+  let humanWon = false;
+  if (result.type === 'player') {
+    humanWon = result.player && !result.player.isCPU;
+  } else if (result.type === 'team') {
+    humanWon = humans.some(p => p.team === result.team.id);
+  }
+
+  const earned = humanWon ? table.win : table.lose;
+  SkinStore.addPoints(earned);
+  return earned;
+}
+
 // 設定画面の選択状態（既定値）
 const setupState = {
   size: 'medium',
@@ -264,6 +294,7 @@ function startGame() {
     },
     onWin: (result) => {
       lastResult = result;
+      const earned = awardMatchPoints(result);
       UI.clearCpuTimer();
       let msg;
       if (result.type === 'team') msg = `${result.team.name}チームの勝利！`;
@@ -272,7 +303,7 @@ function startGame() {
       UI.scheduleWin(() => {
         Sound.stopBGM();
         UI.fxConfetti();
-        showOverlay('🏆 勝利！', msg, true);
+        showOverlay('🏆 勝利！', msg, true, earned);
       });
     },
   };
@@ -292,7 +323,7 @@ function startGame() {
 }
 
 /* ---- オーバーレイ（メニュー / 勝利） ------------------------------ */
-function showOverlay(title, msg, isWin) {
+function showOverlay(title, msg, isWin, earnedPts) {
   document.getElementById('overlay-title').textContent = title;
 
   // ボタン表示切替
@@ -306,6 +337,17 @@ function showOverlay(title, msg, isWin) {
     msgEl.innerHTML = `<span style="color:${lastResult.team.color};font-size:1.2em;font-weight:bold">${msg}</span>`;
   } else {
     msgEl.textContent = msg;
+  }
+
+  // ポイント獲得表示
+  const ptsEl = document.getElementById('overlay-pts');
+  if (ptsEl) {
+    if (isWin && earnedPts > 0) {
+      const total = SkinStore.getPoints();
+      ptsEl.innerHTML = `+${earnedPts}pt 獲得！<span class="pts-total">（累計 ${total.toLocaleString()}pt）</span>`;
+    } else {
+      ptsEl.innerHTML = '';
+    }
   }
 
   // 結果サマリー
@@ -347,6 +389,9 @@ function hideGuide() {
 
 /* ---- 起動時のイベント登録 ----------------------------------------- */
 window.addEventListener('DOMContentLoaded', () => {
+  // 無料スキンを自動解放（price=0 は最初から所持）
+  SKIN_DEFS.filter(s => s.price === 0).forEach(s => SkinStore.purchase(s.id));
+
   // localStorage から前回設定を復元してUIに反映
   loadSettings();
   syncUI();
@@ -371,6 +416,15 @@ window.addEventListener('DOMContentLoaded', () => {
   updateModeUI();
 
   document.getElementById('start-btn').addEventListener('click', startGame);
+
+  // スキンショップ
+  document.getElementById('shop-btn').addEventListener('click', () => {
+    Shop.render();
+    showScreen('shop-screen');
+  });
+  document.getElementById('shop-back-btn').addEventListener('click', () => {
+    showScreen('setup-screen');
+  });
 
   // 画面サイズ変更時に盤面リフィット
   const refit = () => { if (UI.game) UI.fitBoard(); };

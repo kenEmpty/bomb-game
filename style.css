@@ -672,6 +672,180 @@ html, body {
 }
 
 /* =========================================================
+ * スキンショップ画面
+ * ========================================================= */
+#shop-screen {
+  flex-direction: column;
+  align-items: center;
+}
+
+.shop-header {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 12px) 14px 12px;
+  border-bottom: 1px solid var(--panel-2);
+  flex-shrink: 0;
+}
+
+.shop-title {
+  flex: 1;
+  margin: 0;
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+.shop-pts-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--panel-2);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.shop-pts-icon { font-size: 0.82rem; }
+
+.shop-scroll {
+  flex: 1;
+  width: 100%;
+  max-width: 560px;
+  overflow-y: auto;
+  padding: 12px 14px calc(env(safe-area-inset-bottom) + 16px);
+}
+
+.shop-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+#shop-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* スキンカード */
+.skin-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 12px;
+  border: 2px solid transparent;
+  transition: border-color var(--anim);
+}
+
+.skin-card.skin-active {
+  border-color: var(--accent);
+}
+
+.skin-preview {
+  width: 62px;
+  height: 62px;
+  flex-shrink: 0;
+}
+
+.skin-preview .stick {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.skin-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.skin-name {
+  font-size: 1rem;
+  font-weight: bold;
+  line-height: 1.2;
+}
+
+.skin-desc {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
+.skin-badge {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 0.72rem;
+  font-weight: bold;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+.free-badge  { background: var(--accent); color: #fff; }
+.owned-badge { background: var(--panel-2); color: var(--muted); }
+
+.skin-price-tag {
+  margin-top: 5px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--accent);
+}
+
+.skin-price-tag.unaffordable { color: var(--muted); }
+
+.skin-action {
+  flex-shrink: 0;
+  width: 82px;
+}
+
+.skin-action button {
+  width: 100%;
+  font-size: 0.8rem;
+  text-align: center;
+  line-height: 1.35;
+  min-height: 42px;
+}
+
+.skin-action .seg-btn { min-height: 42px; }
+
+/* ショップ専用プライマリボタン（compact） */
+.shop-sm-btn {
+  min-height: 44px !important;
+  margin-top: 0 !important;
+  font-size: 0.8rem !important;
+}
+
+/* =========================================================
+ * 勝利時ポイント獲得表示
+ * ========================================================= */
+.overlay-pts {
+  font-size: 0.95rem;
+  color: var(--accent);
+  font-weight: bold;
+  margin: -4px 0 12px;
+  min-height: 0;
+}
+
+.overlay-pts:empty { display: none; }
+
+.pts-total {
+  font-size: 0.78rem;
+  font-weight: normal;
+  color: var(--muted);
+  margin-left: 5px;
+}
+
+/* 爆弾アニメ：no-spin クラスで回転を抑制 */
+.fx-bomb.no-spin { animation: none; }
+
+/* =========================================================
  * 遊び方ガイド
  * ========================================================= */
 .guide-card {
