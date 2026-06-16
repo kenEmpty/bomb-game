@@ -140,7 +140,7 @@ const UI = {
       // チーム戦：足元にチームカラーの帯を表示
       const teamFlag = (g.settings.mode === 'team' && p.team != null)
         ? `<span class="team-flag" style="background:${g.teams[p.team].color}"></span>` : '';
-      token.innerHTML = badge + SkinStore.getActiveDef().drawCharacter(p.color, p.order) + teamFlag;
+      token.innerHTML = badge + SkinStore.getPlayerSkinDef(p.order - 1).drawCharacter(p.color, p.order) + teamFlag;
       // 直前と位置が変わったトークンは「ぴょこっ」と着地アニメ
       if (this.prevPos && this.prevPos[p.id] && this.prevPos[p.id] !== key(p.r, p.c)) {
         token.classList.add('moved');
@@ -312,7 +312,7 @@ const UI = {
     const isFinal = !!victim && over;
     if (isFinal) this.finalKillInProgress = true; // onWin に即時表示させない
 
-    const skin = SkinStore.getActiveDef();
+    const skin = SkinStore.getPlayerSkinDef(thrower.order - 1);
     const proj = skin.projectile;
     const from = this.cellCenter(thrower.r, thrower.c);
     const to = this.cellCenter(target.r, target.c);
@@ -328,9 +328,9 @@ const UI = {
 
     setTimeout(() => {
       if (victim) {
-        this.fxKill(target.r, target.c, isFinal); // 撃破演出（爆発＋シェイク＋KO）
+        this.fxKill(target.r, target.c, isFinal, skin.explosionTheme);
       } else {
-        this.fxExplode(target.r, target.c, 0);    // 通常の地形破壊（シェイク無し）
+        this.fxExplode(target.r, target.c, 0, skin.explosionTheme);
         Sound.play('explode');
       }
     }, dur);
@@ -338,8 +338,8 @@ const UI = {
 
   /* プレイヤー撃破の共通演出：爆発 → シェイク → KO。最終なら大爆発＋強シェイク後に勝利画面。
    * 爆弾命中・行動不能（投げ場/移動先なし）どちらの脱落でも使う。 */
-  fxKill(r, c, isFinal) {
-    this.fxExplode(r, c, isFinal ? 2 : 1);
+  fxKill(r, c, isFinal, theme) {
+    this.fxExplode(r, c, isFinal ? 2 : 1, theme);
     Sound.play(isFinal ? 'boomBig' : 'boom');
     this.shake(isFinal ? 'strong' : 'normal');
     this.fxKO(r, c, isFinal);
@@ -347,8 +347,7 @@ const UI = {
   },
 
   // 爆発エフェクト（閃光・爆風リング・コア・火花・破片）。intensity:0通常 1撃破 2最終
-  fxExplode(r, c, intensity = 0) {
-    const theme = SkinStore.getActiveDef().explosionTheme;
+  fxExplode(r, c, intensity = 0, theme = null) {
     const p = this.cellCenter(r, c);
     const cell = this.cellEl(r, c);
     const size = cell ? cell.getBoundingClientRect().width : 30;
@@ -436,10 +435,11 @@ const UI = {
   },
 
   // 勝利演出：アクティブスキンの絵文字で紙吹雪を降らせる
-  fxConfetti() {
+  fxConfetti(winnerOrder) {
     Sound.play('win');
     const layer = document.getElementById('overlay');
-    const emojis = SkinStore.getActiveDef().victoryEmojis || ['🎉', '🎊', '✨', '⭐', '💥'];
+    const skin = winnerOrder != null ? SkinStore.getPlayerSkinDef(winnerOrder - 1) : SkinStore.getPlayerSkinDef(0);
+    const emojis = skin.victoryEmojis || ['🎉', '🎊', '✨', '⭐', '💥'];
     for (let i = 0; i < 24; i++) {
       const c = document.createElement('div');
       c.className = 'confetti';

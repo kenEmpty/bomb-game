@@ -187,6 +187,27 @@ function renderPlayerOptions() {
       row.appendChild(diffSeg);
     }
 
+    // スキン選択（所持スキンが2種以上あるときのみ表示）
+    const owned = SkinStore.getOwned();
+    const ownedDefs = SKIN_DEFS.filter(s => owned.includes(s.id));
+    if (ownedDefs.length >= 2) {
+      const currentSkinId = SkinStore.getPlayerSkin(i);
+      const skinRow = document.createElement('div');
+      skinRow.className = 'skin-pick-row';
+      for (const skin of ownedDefs) {
+        const b = document.createElement('button');
+        b.className = 'seg-btn skin-mini-btn' + (currentSkinId === skin.id ? ' active' : '');
+        b.title = skin.name;
+        b.innerHTML = skin.drawCharacter(CONFIG.PLAYER_COLORS[i], i + 1);
+        b.addEventListener('click', () => {
+          SkinStore.setPlayerSkin(i, skin.id);
+          renderPlayerOptions();
+        });
+        skinRow.appendChild(b);
+      }
+      row.appendChild(skinRow);
+    }
+
     // チーム選択（チーム戦＋手動編成のときのみ）
     if (setupState.mode === 'team' && setupState.teamMode === 'manual') {
       if (conf.team == null || conf.team >= setupState.teamCount) conf.team = i % setupState.teamCount;
@@ -289,7 +310,8 @@ function startGame() {
         const g = UI.game;
         const over = g.settings.mode === 'team' ? g.aliveTeams().length <= 1 : g.aliveCount <= 1;
         if (over) UI.finalKillInProgress = true;
-        UI.fxKill(p.r, p.c, over);
+        const theme = SkinStore.getPlayerSkinDef(p.order - 1).explosionTheme;
+        UI.fxKill(p.r, p.c, over, theme);
       }
       const why = reason === 'bomb' ? '爆弾命中' : '行動不能';
       UI.setStatus(`💥 プレイヤー${'①②③④'[p.order - 1]} 脱落（${why}）`);
@@ -298,13 +320,20 @@ function startGame() {
       lastResult = result;
       const earned = awardMatchPoints(result);
       UI.clearCpuTimer();
-      let msg;
-      if (result.type === 'team') msg = `${result.team.name}チームの勝利！`;
-      else if (result.type === 'player') msg = `プレイヤー${'①②③④'[result.player.order - 1]} の勝利！`;
-      else msg = '引き分け';
+      let msg, winnerOrder = null;
+      if (result.type === 'team') {
+        msg = `${result.team.name}チームの勝利！`;
+        const w = game.players.find(p => p.team === result.team.id && p.alive);
+        winnerOrder = w ? w.order : null;
+      } else if (result.type === 'player') {
+        msg = `プレイヤー${'①②③④'[result.player.order - 1]} の勝利！`;
+        winnerOrder = result.player.order;
+      } else {
+        msg = '引き分け';
+      }
       UI.scheduleWin(() => {
         Sound.stopBGM();
-        UI.fxConfetti();
+        UI.fxConfetti(winnerOrder);
         showOverlay('🏆 勝利！', msg, true, earned);
       });
     },

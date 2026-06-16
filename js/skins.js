@@ -250,6 +250,24 @@ const SkinStore = (() => {
       return this.getSkinDef(this.getActive());
     },
 
+    /* プレイヤー個別スキン（index: 0-3） */
+    getPlayerSkin(index) {
+      const d = load();
+      const id = d.playerSkins && d.playerSkins[index];
+      return (id && (d.owned || ['default']).includes(id)) ? id : 'default';
+    },
+    setPlayerSkin(index, skinId) {
+      const d = load();
+      if (!(d.owned || ['default']).includes(skinId)) return false;
+      if (!d.playerSkins) d.playerSkins = ['default', 'default', 'default', 'default'];
+      d.playerSkins[index] = skinId;
+      save(d);
+      return true;
+    },
+    getPlayerSkinDef(index) {
+      return this.getSkinDef(this.getPlayerSkin(index));
+    },
+
     addPoints(n) {
       const d = load();
       d.points = Math.max(0, d.points + n);

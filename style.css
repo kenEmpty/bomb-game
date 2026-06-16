@@ -97,6 +97,26 @@ html, body {
 .prow-num { font-size: 1.3rem; width: 28px; text-align: center; }
 .player-row .seg { flex: 1; }
 
+/* プレイヤー別スキン選択（設定画面） */
+.skin-pick-row {
+  flex-basis: 100%;
+  display: flex;
+  gap: 4px;
+  padding-top: 2px;
+  flex-wrap: wrap;
+}
+.skin-mini-btn {
+  width: 36px;
+  height: 36px;
+  padding: 2px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.skin-mini-btn .stick { width: 28px; height: 28px; }
+
 .primary-btn {
   width: 100%;
   min-height: 52px;
