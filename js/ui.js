@@ -201,7 +201,7 @@ const UI = {
         (c.nextAtk  ? ' danger'  : '') +
         (isExpert   ? ' expert'  : '');
       if (isExpert) {
-        tag.textContent = `${c.score}\n🏃${c.survArea}${c.killExpect > 0 ? '💀' + c.killExpect : ''}`;
+        tag.textContent = `${c.score}\n🏃${c.survArea}${c.oppSurv != null ? '/' + c.oppSurv : ''}`;
         if (c.reason) tag.title = c.reason;
       } else {
         tag.textContent = c.score;
