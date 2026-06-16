@@ -2,11 +2,9 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <!-- スマホ最適化：拡大禁止・セーフエリア対応 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>ボムサバイバル</title>
 
-  <!-- ファビコン / ホーム画面追加(PWA)用アイコン -->
   <link rel="icon" type="image/x-icon" href="icons/favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
@@ -17,15 +15,23 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="ボムサバイバル" />
 
-  <link rel="stylesheet" href="style.css?v=8" />
+  <link rel="stylesheet" href="style.css?v=9" />
 </head>
 <body>
   <!-- ===== 設定画面 ===== -->
   <section id="setup-screen" class="screen active">
     <div class="panel">
-      <h1>💣 ボムサバイバル</h1>
-      <p class="subtitle">爆弾で地形を壊しながら最後の1人を目指せ</p>
 
+      <!-- ヘッダー：アイコン＋タイトル -->
+      <div class="setup-header">
+        <img src="icons/icon-192.png" alt="" class="setup-icon" />
+        <div class="setup-header-text">
+          <h1>ボムサバイバル</h1>
+          <p class="subtitle">爆弾で地形を壊しながら最後の1人を目指せ</p>
+        </div>
+      </div>
+
+      <!-- かんたん設定（常時表示） -->
       <div class="field">
         <label>マップサイズ</label>
         <div class="seg" id="opt-size">
@@ -45,85 +51,85 @@
       </div>
 
       <div class="field">
-        <label>ゲームモード</label>
-        <div class="seg" id="opt-mode">
-          <button data-val="ffa" class="seg-btn active">個人戦</button>
-          <button data-val="team" class="seg-btn">チーム戦</button>
-        </div>
-      </div>
-
-      <div class="field team-only">
-        <label>チーム数</label>
-        <div class="seg" id="opt-teamcount">
-          <button data-val="2" class="seg-btn active">2</button>
-          <button data-val="3" class="seg-btn">3</button>
-          <button data-val="4" class="seg-btn">4</button>
-        </div>
-      </div>
-
-      <div class="field team-only">
-        <label>チーム編成</label>
-        <div class="seg" id="opt-teammode">
-          <button data-val="random" class="seg-btn active">ランダム</button>
-          <button data-val="manual" class="seg-btn">手動</button>
-        </div>
-      </div>
-
-      <!-- プレイヤーごとの 人間/CPU・難易度・(手動時)チーム を選ぶ -->
-      <div class="field" id="opt-players-wrap">
         <label>各プレイヤー設定</label>
         <div id="opt-players"></div>
       </div>
 
-      <div class="field team-only">
-        <label>味方攻撃（フレンドリーファイア）</label>
-        <div class="seg" id="opt-ff">
-          <button data-val="off" class="seg-btn active">OFF</button>
-          <button data-val="on" class="seg-btn">ON</button>
-        </div>
-      </div>
+      <!-- 詳細設定（折りたたみアコーディオン） -->
+      <details id="advanced-settings">
+        <summary>詳細設定</summary>
+        <div class="advanced-inner">
 
-      <div class="field">
-        <label>ランダム障害物</label>
-        <div class="seg" id="opt-obstacles">
-          <button data-val="off" class="seg-btn active">OFF</button>
-          <button data-val="on" class="seg-btn">ON</button>
-        </div>
-      </div>
+          <div class="field">
+            <label>ゲームモード</label>
+            <div class="seg" id="opt-mode">
+              <button data-val="ffa" class="seg-btn active">個人戦</button>
+              <button data-val="team" class="seg-btn">チーム戦</button>
+            </div>
+          </div>
 
-      <div class="field">
-        <label>移動ルール（同一ターン内）</label>
-        <div class="seg" id="opt-revisit">
-          <button data-val="allow" class="seg-btn active">再訪可能</button>
-          <button data-val="forbid" class="seg-btn">再訪禁止</button>
-        </div>
-      </div>
+          <div class="field team-only">
+            <label>チーム数</label>
+            <div class="seg" id="opt-teamcount">
+              <button data-val="2" class="seg-btn active">2</button>
+              <button data-val="3" class="seg-btn">3</button>
+              <button data-val="4" class="seg-btn">4</button>
+            </div>
+          </div>
 
-      <div class="field">
-        <label>効果音</label>
-        <div class="seg" id="opt-se">
-          <button data-val="on" class="seg-btn active">ON</button>
-          <button data-val="off" class="seg-btn">OFF</button>
-        </div>
-      </div>
+          <div class="field team-only">
+            <label>チーム編成</label>
+            <div class="seg" id="opt-teammode">
+              <button data-val="random" class="seg-btn active">ランダム</button>
+              <button data-val="manual" class="seg-btn">手動</button>
+            </div>
+          </div>
 
-      <div class="field">
-        <label>BGM</label>
-        <div class="seg" id="opt-bgm">
-          <button data-val="off" class="seg-btn">OFF</button>
-          <button data-val="on" class="seg-btn active">ON</button>
-        </div>
-      </div>
+          <div class="field team-only">
+            <label>味方攻撃（フレンドリーファイア）</label>
+            <div class="seg" id="opt-ff">
+              <button data-val="off" class="seg-btn active">OFF</button>
+              <button data-val="on" class="seg-btn">ON</button>
+            </div>
+          </div>
 
-      <div class="field">
-        <label>CPU評価デバッグ表示（Hard）</label>
-        <div class="seg" id="opt-cpudebug">
-          <button data-val="off" class="seg-btn active">OFF</button>
-          <button data-val="on" class="seg-btn">ON</button>
-        </div>
-      </div>
+          <div class="field">
+            <label>ランダム障害物</label>
+            <div class="seg" id="opt-obstacles">
+              <button data-val="off" class="seg-btn active">OFF</button>
+              <button data-val="on" class="seg-btn">ON</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>移動ルール（同一ターン内）</label>
+            <div class="seg" id="opt-revisit">
+              <button data-val="allow" class="seg-btn active">再訪可能</button>
+              <button data-val="forbid" class="seg-btn">再訪禁止</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>効果音</label>
+            <div class="seg" id="opt-se">
+              <button data-val="on" class="seg-btn active">ON</button>
+              <button data-val="off" class="seg-btn">OFF</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>BGM</label>
+            <div class="seg" id="opt-bgm">
+              <button data-val="off" class="seg-btn">OFF</button>
+              <button data-val="on" class="seg-btn active">ON</button>
+            </div>
+          </div>
+
+        </div><!-- /.advanced-inner -->
+      </details>
 
       <button id="start-btn" class="primary-btn">ゲーム開始</button>
+      <button id="guide-open-btn" class="ghost-btn">遊び方を見る</button>
     </div>
   </section>
 
@@ -137,7 +143,6 @@
       <button id="menu-btn" class="icon-btn" title="メニュー">≡</button>
     </header>
 
-    <!-- プレイヤー一覧（手番・生存状況を一目で確認） -->
     <div id="roster"></div>
 
     <div id="board-wrap">
@@ -155,17 +160,72 @@
     <div class="overlay-card">
       <h2 id="overlay-title">メニュー</h2>
       <p id="overlay-msg"></p>
+
+      <!-- 勝利時のみ：結果サマリー -->
+      <div id="overlay-summary"></div>
+
+      <!-- メニュー時のみ：サウンドトグル＋遊び方 -->
+      <div id="menu-controls" class="menu-controls">
+        <div class="menu-toggle-row">
+          <button id="menu-se-btn" class="seg-btn active">🔊 SE: ON</button>
+          <button id="menu-bgm-btn" class="seg-btn active">♪ BGM: ON</button>
+        </div>
+        <button id="menu-guide-btn" class="ghost-btn small-btn">遊び方を見る</button>
+      </div>
+
+      <button id="overlay-rematch" class="primary-btn">もう一度（同じ設定）</button>
       <button id="overlay-resume" class="primary-btn">ゲームに戻る</button>
       <button id="overlay-restart" class="ghost-btn">設定画面に戻る</button>
     </div>
   </div>
 
-  <!-- 読み込み順：設定→ゲームロジック→UI→起動 -->
-  <script src="js/config.js?v=8"></script>
-  <script src="js/game.js?v=8"></script>
-  <script src="js/cpu.js?v=8"></script>
-  <script src="js/audio.js?v=8"></script>
-  <script src="js/ui.js?v=8"></script>
-  <script src="js/main.js?v=8"></script>
+  <!-- ===== 遊び方ガイド ===== -->
+  <div id="guide-overlay" class="overlay">
+    <div class="overlay-card guide-card">
+      <h2>遊び方</h2>
+      <div class="guide-content">
+        <div class="guide-steps">
+          <div class="guide-step">
+            <span class="guide-num">①</span>
+            <div><b>爆弾を投げる</b><br>8方向・射程1〜2マスをタップ。相手に当たれば即脱落。着弾マスは壊れる。</div>
+          </div>
+          <div class="guide-step">
+            <span class="guide-num">②</span>
+            <div><b>3歩移動する</b><br>壊れたマス・場外以外を移動。他のキャラをすり抜けられるが同じマスには止まれない。</div>
+          </div>
+          <div class="guide-step">
+            <span class="guide-num">③</span>
+            <div><b>ターン終了</b><br>移動前にいたマスが崩れる。行き場がなくなっても脱落。</div>
+          </div>
+        </div>
+        <svg class="guide-diagram" viewBox="0 0 160 150" xmlns="http://www.w3.org/2000/svg">
+          <!-- center cell -->
+          <rect x="58" y="55" width="44" height="44" rx="7" fill="#3a3a66"/>
+          <text x="80" y="84" text-anchor="middle" font-size="24">💣</text>
+          <!-- 8方向の矢印 -->
+          <g fill="#ff5470" opacity="0.9">
+            <polygon points="80,6 74,20 86,20"/>
+            <polygon points="80,144 74,130 86,130"/>
+            <polygon points="6,77 20,71 20,83"/>
+            <polygon points="154,77 140,71 140,83"/>
+            <polygon points="24,24 32,38 38,32"/>
+            <polygon points="136,24 130,38 122,32"/>
+            <polygon points="24,130 38,122 32,116"/>
+            <polygon points="136,130 122,116 130,122"/>
+          </g>
+          <text x="80" y="148" text-anchor="middle" font-size="10" fill="#9aa">8方向・射程1〜2マス</text>
+        </svg>
+        <p class="guide-note">最後の1人（チーム戦は最後のチーム）が勝利！</p>
+      </div>
+      <button id="guide-close-btn" class="primary-btn">閉じる</button>
+    </div>
+  </div>
+
+  <script src="js/config.js?v=9"></script>
+  <script src="js/game.js?v=9"></script>
+  <script src="js/cpu.js?v=9"></script>
+  <script src="js/audio.js?v=9"></script>
+  <script src="js/ui.js?v=9"></script>
+  <script src="js/main.js?v=9"></script>
 </body>
 </html>

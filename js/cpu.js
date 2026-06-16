@@ -302,7 +302,8 @@ function enumeratePaths(game, self) {
       if (!game.inField(nr, nc)) continue;
       if (game.grid[nr][nc] === CELL.DESTROYED) continue;
       const occ = game.playerAt(nr, nc);
-      if (occ && occ.id !== self.id) continue;       // 他プレイヤー（自分の元位置は空き扱い）
+      // 最終歩のみ他プレイヤーのマスへの停止を禁止（途中通過はOK）
+      if (occ && occ.id !== self.id && movesLeftHere === 1) continue;
       // 最後の1歩では開始マスに留まれない（移動後に破壊されるため）
       if (movesLeftHere === 1 && nr === game.startCell.r && nc === game.startCell.c) continue;
       if (!allowRevisit && visited.has(key(nr, nc))) continue; // 再訪禁止

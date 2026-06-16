@@ -235,7 +235,8 @@ class Game {
       const c = p.c + d.dc;
       if (!this.inField(r, c)) continue;             // フィールド外
       if (this.grid[r][c] === CELL.DESTROYED) continue; // 破壊済み
-      if (this.playerAt(r, c)) continue;             // 他プレイヤー
+      // 他プレイヤーのマスはすり抜け可（途中通過OK）、最終歩のみ停止禁止
+      if (this.movesLeft === 1 && this.playerAt(r, c)) continue;
       // 最後の1歩では開始マスに留まれない（移動後に破壊されるため）。
       // 途中の通過・再訪はOK。
       if (this.movesLeft === 1 && this.startCell &&

@@ -10,12 +10,14 @@
   --panel-2: #2a2a52;
   --text: #eef;
   --muted: #9aa;
-  --accent: #ff5470;
+  --accent: #8b5cf6;        /* UIアクセント：プレイヤー色と独立したバイオレット */
+  --accent-bomb: #ff8c2a;  /* 爆弾ハイライト専用色（橙） */
+  --accent-move: #2ec4b6;  /* 移動ハイライト専用色（ティール） */
   --normal-cell: #3a3a66;
   --normal-cell-2: #44447a;
   --destroyed: #0c0c18;
-  --hl-bomb: rgba(255, 84, 112, 0.55);
-  --hl-move: rgba(46, 196, 182, 0.55);
+  --hl-bomb: rgba(255, 140, 42, 0.45);
+  --hl-move: rgba(46, 196, 182, 0.45);
   --anim: 0.25s; /* 基本アニメ時間（Step3で活用） */
 }
 
@@ -78,6 +80,8 @@ html, body {
   color: #fff;
   font-weight: bold;
 }
+/* チーム選択ボタンはチームカラーを使う（--tcolor で上書き） */
+.team-select .seg-btn.active { background: var(--tcolor); border-color: var(--tcolor); }
 
 /* プレイヤー設定行 */
 .player-row {
@@ -280,9 +284,22 @@ html, body {
   box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.85);
 }
 
-/* ハイライト */
-.cell.hl-bomb { background: var(--hl-bomb); box-shadow: inset 0 0 0 2px var(--accent); cursor: pointer; }
-.cell.hl-move { background: var(--hl-move); box-shadow: inset 0 0 0 2px #2ec4b6; cursor: pointer; }
+/* ハイライト（色＋パターンで二重符号化：色覚に依存しない区別） */
+.cell.hl-bomb {
+  background: var(--hl-bomb);
+  background-image: repeating-linear-gradient(
+    -45deg, transparent, transparent 5px, rgba(255,140,42,0.18) 5px, rgba(255,140,42,0.18) 6px
+  );
+  box-shadow: inset 0 0 0 2px var(--accent-bomb);
+  cursor: pointer;
+}
+.cell.hl-move {
+  background: var(--hl-move);
+  background-image: radial-gradient(circle, rgba(46,196,182,0.5) 2px, transparent 2px);
+  background-size: 9px 9px;
+  box-shadow: inset 0 0 0 2px var(--accent-move);
+  cursor: pointer;
+}
 
 /* CPU評価デバッグ：移動先候補に重ねるスコア */
 .cpu-dbg {
@@ -519,3 +536,174 @@ html, body {
 }
 .overlay-card h2 { margin: 0 0 8px; font-size: 1.5rem; }
 .overlay-card p { color: var(--muted); margin: 0 0 16px; }
+
+/* =========================================================
+ * 設定画面ヘッダー（アイコン＋タイトル）
+ * ========================================================= */
+.setup-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.setup-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+.setup-header-text h1 {
+  font-size: 1.5rem;
+  margin: 0 0 2px;
+}
+.setup-header-text .subtitle {
+  font-size: 0.82rem;
+  margin: 0;
+  color: var(--muted);
+  text-align: left;
+}
+
+/* =========================================================
+ * 詳細設定アコーディオン
+ * ========================================================= */
+#advanced-settings {
+  margin-bottom: 16px;
+  border: 1px solid var(--panel-2);
+  border-radius: 12px;
+  overflow: hidden;
+}
+#advanced-settings > summary {
+  list-style: none;
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+}
+#advanced-settings > summary::after {
+  content: '▶';
+  font-size: 0.7rem;
+  margin-left: auto;
+  transition: transform 0.2s;
+}
+#advanced-settings[open] > summary::after {
+  transform: rotate(90deg);
+}
+#advanced-settings > summary::-webkit-details-marker { display: none; }
+.advanced-inner {
+  padding: 12px 14px 4px;
+  background: var(--panel);
+  border-top: 1px solid var(--panel-2);
+}
+
+/* =========================================================
+ * プレイヤー行カード（色付き左ボーダー）
+ * ========================================================= */
+.player-row {
+  border-left: 3px solid var(--pcolor, var(--panel-2));
+}
+
+/* 設定画面の ghost-btn small variant */
+.ghost-btn.small-btn {
+  min-height: 38px;
+  font-size: 0.85rem;
+  margin-top: 6px;
+}
+
+/* =========================================================
+ * メニューオーバーレイ：サウンドトグル
+ * ========================================================= */
+.menu-controls {
+  margin-bottom: 12px;
+}
+.menu-toggle-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 0;
+}
+.menu-toggle-row .seg-btn {
+  flex: 1;
+  min-height: 40px;
+  font-size: 0.85rem;
+}
+
+/* =========================================================
+ * 勝利サマリー
+ * ========================================================= */
+#overlay-summary {
+  margin-bottom: 14px;
+  text-align: left;
+}
+.summary-table-wrap {
+  overflow-x: auto;
+}
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.summary-table th {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: normal;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--panel-2);
+  text-align: left;
+}
+.summary-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.rank-cell { font-size: 1.1rem; width: 2.2em; }
+.kills-cell { text-align: center; font-weight: bold; color: var(--accent); }
+.summary-name { font-weight: bold; }
+.summary-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 3px;
+  vertical-align: middle;
+}
+
+/* =========================================================
+ * 遊び方ガイド
+ * ========================================================= */
+.guide-card {
+  max-width: 400px;
+  text-align: left;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.guide-card h2 { text-align: center; margin-bottom: 12px; }
+.guide-steps { margin-bottom: 10px; }
+.guide-step {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.guide-num {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+.guide-diagram {
+  display: block;
+  margin: 0 auto 10px;
+  width: 140px;
+  height: 130px;
+}
+.guide-note {
+  text-align: center;
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin: 0 0 14px;
+}

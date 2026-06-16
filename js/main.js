@@ -4,20 +4,21 @@
  * Game(モデル) と UI(描画) を接続する。
  * ========================================================================= */
 
+const STORAGE_KEY = 'bombgame-settings-v2';
+
 // 設定画面の選択状態（既定値）
 const setupState = {
   size: 'medium',
   count: 2,
   obstacles: false,
   revisit: 'allow',
-  se: true,        // 効果音（既定ON）
-  bgm: true,       // BGM（既定ON）
-  cpuDebug: false, // CPU評価デバッグ表示（既定OFF）
-  mode: 'ffa',     // ゲームモード 'ffa'(個人戦) / 'team'(チーム戦)
-  teamMode: 'random', // チーム編成 'random' / 'manual'
-  teamCount: 2,    // チーム数（将来3〜4へ拡張可能）
-  friendlyFire: false, // 味方攻撃（既定OFF）
-  // 各プレイヤー設定。team は手動チーム編成で使用（既定は交互割り当て）。
+  se: true,
+  bgm: true,
+  cpuDebug: false,
+  mode: 'ffa',
+  teamMode: 'random',
+  teamCount: 2,
+  friendlyFire: false,
   players: [
     { isCPU: false, difficulty: 'normal', team: 0 },
     { isCPU: false, difficulty: 'normal', team: 1 },
@@ -27,6 +28,72 @@ const setupState = {
 };
 
 let game = null;
+let lastResult = null;     // 直前のゲーム勝利結果（サマリー表示用）
+let eliminationOrder = []; // 脱落した順のプレイヤーID
+let killLog = [];          // [{killerId, victimId}]
+
+/* ---- localStorage 保存・復元 --------------------------------------- */
+function saveSettings() {
+  try {
+    const data = {
+      size: setupState.size,
+      count: setupState.count,
+      obstacles: setupState.obstacles,
+      revisit: setupState.revisit,
+      se: setupState.se,
+      bgm: setupState.bgm,
+      mode: setupState.mode,
+      teamMode: setupState.teamMode,
+      teamCount: setupState.teamCount,
+      friendlyFire: setupState.friendlyFire,
+      players: setupState.players.map(p => ({
+        isCPU: p.isCPU,
+        difficulty: p.difficulty,
+        team: p.team,
+      })),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {}
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    const valid = ['size','count','obstacles','revisit','se','bgm','mode','teamMode','teamCount','friendlyFire'];
+    for (const k of valid) {
+      if (k in saved) setupState[k] = saved[k];
+    }
+    if (Array.isArray(saved.players)) {
+      for (let i = 0; i < 4; i++) {
+        if (saved.players[i]) Object.assign(setupState.players[i], saved.players[i]);
+      }
+    }
+  } catch (e) {}
+}
+
+// セグメントボタンの active を setupState の値に合わせる
+function syncSegment(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.querySelectorAll('.seg-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === String(value));
+  });
+}
+
+function syncUI() {
+  syncSegment('opt-size', setupState.size);
+  syncSegment('opt-count', setupState.count);
+  syncSegment('opt-mode', setupState.mode);
+  syncSegment('opt-teamcount', setupState.teamCount);
+  syncSegment('opt-teammode', setupState.teamMode);
+  syncSegment('opt-ff', setupState.friendlyFire ? 'on' : 'off');
+  syncSegment('opt-obstacles', setupState.obstacles ? 'on' : 'off');
+  syncSegment('opt-revisit', setupState.revisit);
+  syncSegment('opt-se', setupState.se ? 'on' : 'off');
+  syncSegment('opt-bgm', setupState.bgm ? 'on' : 'off');
+}
 
 /* ---- 画面切り替え ------------------------------------------------- */
 function showScreen(id) {
@@ -37,6 +104,7 @@ function showScreen(id) {
 /* ---- セグメントボタン（排他選択）の共通処理 ----------------------- */
 function bindSegment(containerId, onSelect) {
   const container = document.getElementById(containerId);
+  if (!container) return;
   container.addEventListener('click', e => {
     const btn = e.target.closest('.seg-btn');
     if (!btn) return;
@@ -54,11 +122,12 @@ function renderPlayerOptions() {
     const conf = setupState.players[i];
     const row = document.createElement('div');
     row.className = 'player-row';
+    row.style.setProperty('--pcolor', CONFIG.PLAYER_COLORS[i]);
 
     const numChar = '①②③④'[i];
     row.innerHTML = `<span class="prow-num">${numChar}</span>`;
 
-    // 人間/CPU 切り替え（Step2でCPU有効化。今はhumanのみ動作）
+    // 人間/CPU 切り替え
     const typeSeg = document.createElement('div');
     typeSeg.className = 'seg mini';
     typeSeg.innerHTML = `
@@ -113,14 +182,55 @@ function updateModeUI() {
   document.querySelectorAll('.team-only').forEach(el => {
     el.style.display = isTeam ? '' : 'none';
   });
-  // 手動チーム設定欄はチーム戦＋手動のときのみ
-  const manualHint = document.getElementById('opt-teamcount-wrap');
-  if (manualHint) manualHint.style.display = isTeam ? '' : 'none';
   renderPlayerOptions();
+}
+
+/* ---- 勝利結果サマリーHTML生成 ------------------------------------- */
+function buildSummary() {
+  if (!game) return '';
+  const g = game;
+  const humanCount = g.players.filter(p => !p.isCPU).length;
+
+  // kills 集計
+  const kills = {};
+  for (const p of g.players) kills[p.id] = 0;
+  for (const k of killLog) kills[k.killerId] = (kills[k.killerId] || 0) + 1;
+
+  // 順位ソート：alive（未脱落）が上位、脱落は後から脱落した順に上位
+  const sorted = [...g.players].sort((a, b) => {
+    const ai = eliminationOrder.indexOf(a.id);
+    const bi = eliminationOrder.indexOf(b.id);
+    return (ai === -1 ? -1 : ai) - (bi === -1 ? -1 : bi);
+  });
+
+  let html = '<div class="summary-table-wrap"><table class="summary-table">';
+  html += '<tr><th></th><th>プレイヤー</th><th>撃破</th></tr>';
+
+  sorted.forEach((p, i) => {
+    const medal = ['🥇', '🥈', '🥉'][i] || (i + 1) + '位';
+    const label = UI.playerLabel(p, humanCount);
+    const num = '①②③④'[p.order - 1];
+    const teamDot = (g.settings.mode === 'team' && p.team != null)
+      ? `<span class="summary-dot" style="background:${g.teams[p.team].color}"></span>` : '';
+    html += `<tr><td class="rank-cell">${medal}</td>` +
+      `<td><span class="summary-name" style="color:${p.color}">${num}${teamDot}</span> ${label}</td>` +
+      `<td class="kills-cell">${kills[p.id]}</td></tr>`;
+  });
+
+  html += '</table></div>';
+  return html;
 }
 
 /* ---- ゲーム開始 --------------------------------------------------- */
 function startGame() {
+  // 設定を localStorage に保存
+  saveSettings();
+
+  // 前回の記録をリセット
+  eliminationOrder = [];
+  killLog = [];
+  lastResult = null;
+
   const settings = {
     size: setupState.size,
     obstacles: setupState.obstacles,
@@ -133,49 +243,44 @@ function startGame() {
       .map(p => ({ isCPU: p.isCPU, difficulty: p.difficulty, team: p.team })),
   };
 
-  // UIへ通知するフック（Step3でアニメーションを差し込む余地を残す）
   const hooks = {
-    // 手番開始：人間/CPUの振り分けは UI.beginTurn が担当
     onTurnStart: () => UI.beginTurn(),
-    // 爆弾投擲：投擲→着弾→爆発アニメ（命中時は victim にKO演出）
-    onBomb: (cell, thrower, victim) => UI.fxThrow(thrower, cell, victim),
-    // 移動：1歩ごとのクリック音
+    onBomb: (cell, thrower, victim) => {
+      if (victim) killLog.push({ killerId: thrower.id, victimId: victim.id });
+      UI.fxThrow(thrower, cell, victim);
+    },
     onMove: () => Sound.play('step'),
-    // 開始マス破壊：低い衝撃音
     onDestroyStart: () => Sound.play('thud'),
     onEliminate: (p, reason) => {
-      // 行動不能（投げ場/移動先なし）も爆弾撃破と同じ演出にする。
-      // 爆弾命中は fxThrow 側で演出するためここでは扱わない。
+      eliminationOrder.push(p.id);
       if (reason === 'stuck') {
         const g = UI.game;
         const over = g.settings.mode === 'team' ? g.aliveTeams().length <= 1 : g.aliveCount <= 1;
-        if (over) UI.finalKillInProgress = true; // onWin に即時表示させない
+        if (over) UI.finalKillInProgress = true;
         UI.fxKill(p.r, p.c, over);
       }
-      const why = reason === 'bomb' ? '爆弾で命中' : '行動不能';
-      UI.setStatus(`💥 プレイヤー${'①②③④'[p.order-1]} 脱落（${why}）`);
+      const why = reason === 'bomb' ? '爆弾命中' : '行動不能';
+      UI.setStatus(`💥 プレイヤー${'①②③④'[p.order - 1]} 脱落（${why}）`);
     },
     onWin: (result) => {
+      lastResult = result;
       UI.clearCpuTimer();
       let msg;
       if (result.type === 'team') msg = `${result.team.name}チームの勝利！`;
       else if (result.type === 'player') msg = `プレイヤー${'①②③④'[result.player.order - 1]} の勝利！`;
       else msg = '引き分け';
-      // 最終撃破の演出（大爆発→シェイク→0.5s静止）後に勝利画面を出す
       UI.scheduleWin(() => {
-        Sound.stopBGM();   // 勝利ジングルを目立たせるためBGM停止
+        Sound.stopBGM();
         UI.fxConfetti();
         showOverlay('🏆 勝利！', msg, true);
       });
     },
   };
 
-  // サウンド有効化（このタップがモバイルの自動再生制限を解除する操作になる）
   Sound.unlock();
   Sound.setSE(setupState.se);
   Sound.setBGM(setupState.bgm);
 
-  // CPUデバッグ表示の有効化（毎ゲーム状態をリセット）
   CPU.debug = setupState.cpuDebug;
   CPU.lastEval = null;
   CPU._plan = null;
@@ -183,72 +288,148 @@ function startGame() {
   game = new Game(settings, hooks);
   showScreen('game-screen');
   UI.init(game);
-  game.startTurn(); // onTurnStart → UI.beginTurn が初手をセットアップ
+  game.startTurn();
 }
 
 /* ---- オーバーレイ（メニュー / 勝利） ------------------------------ */
 function showOverlay(title, msg, isWin) {
   document.getElementById('overlay-title').textContent = title;
-  document.getElementById('overlay-msg').textContent = msg;
-  // 勝利時は「ゲームに戻る」を隠す
+
+  // ボタン表示切替
   document.getElementById('overlay-resume').style.display = isWin ? 'none' : '';
+  document.getElementById('overlay-rematch').style.display = isWin ? '' : 'none';
+  document.getElementById('menu-controls').style.display = isWin ? 'none' : '';
+
+  // チーム勝利時はメッセージをチームカラーで着色
+  const msgEl = document.getElementById('overlay-msg');
+  if (isWin && lastResult && lastResult.type === 'team' && lastResult.team) {
+    msgEl.innerHTML = `<span style="color:${lastResult.team.color};font-size:1.2em;font-weight:bold">${msg}</span>`;
+  } else {
+    msgEl.textContent = msg;
+  }
+
+  // 結果サマリー
+  const sumEl = document.getElementById('overlay-summary');
+  sumEl.innerHTML = isWin ? buildSummary() : '';
+  sumEl.style.display = isWin ? '' : 'none';
+
+  if (!isWin) updateMenuToggles();
+
   document.getElementById('overlay').classList.add('show');
 }
+
 function hideOverlay() {
   document.getElementById('overlay').classList.remove('show');
-  if (UI.game) UI.lockInput(300); // 「戻る」タップの盤面貫通を防ぐ
+  if (UI.game) UI.lockInput(300);
+}
+
+/* ---- メニュー内サウンドトグル ------------------------------------- */
+function updateMenuToggles() {
+  const seBtn = document.getElementById('menu-se-btn');
+  const bgmBtn = document.getElementById('menu-bgm-btn');
+  if (seBtn) {
+    seBtn.textContent = `🔊 SE: ${setupState.se ? 'ON' : 'OFF'}`;
+    seBtn.classList.toggle('active', setupState.se);
+  }
+  if (bgmBtn) {
+    bgmBtn.textContent = `♪ BGM: ${setupState.bgm ? 'ON' : 'OFF'}`;
+    bgmBtn.classList.toggle('active', setupState.bgm);
+  }
+}
+
+/* ---- 遊び方ガイド ------------------------------------------------- */
+function showGuide() {
+  document.getElementById('guide-overlay').classList.add('show');
+}
+function hideGuide() {
+  document.getElementById('guide-overlay').classList.remove('show');
 }
 
 /* ---- 起動時のイベント登録 ----------------------------------------- */
 window.addEventListener('DOMContentLoaded', () => {
-  bindSegment('opt-size', v => setupState.size = v);
+  // localStorage から前回設定を復元してUIに反映
+  loadSettings();
+  syncUI();
+
+  bindSegment('opt-size', v => { setupState.size = v; });
   bindSegment('opt-count', v => { setupState.count = parseInt(v, 10); renderPlayerOptions(); });
-  bindSegment('opt-obstacles', v => setupState.obstacles = (v === 'on'));
-  bindSegment('opt-revisit', v => setupState.revisit = v);
-  bindSegment('opt-se', v => setupState.se = (v === 'on'));
-  bindSegment('opt-bgm', v => setupState.bgm = (v === 'on'));
-  bindSegment('opt-cpudebug', v => setupState.cpuDebug = (v === 'on'));
+  bindSegment('opt-obstacles', v => { setupState.obstacles = (v === 'on'); });
+  bindSegment('opt-revisit', v => { setupState.revisit = v; });
+  bindSegment('opt-se', v => { setupState.se = (v === 'on'); });
+  bindSegment('opt-bgm', v => { setupState.bgm = (v === 'on'); });
   bindSegment('opt-mode', v => { setupState.mode = v; updateModeUI(); });
   bindSegment('opt-teammode', v => { setupState.teamMode = v; renderPlayerOptions(); });
   bindSegment('opt-teamcount', v => { setupState.teamCount = parseInt(v, 10); renderPlayerOptions(); });
-  bindSegment('opt-ff', v => setupState.friendlyFire = (v === 'on'));
+  bindSegment('opt-ff', v => { setupState.friendlyFire = (v === 'on'); });
 
   // URLに ?cpudebug=1 が付いていればデバッグ表示を初期ONにする
   if (new URLSearchParams(location.search).get('cpudebug') === '1') {
     setupState.cpuDebug = true;
-    const seg = document.getElementById('opt-cpudebug');
-    seg.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b.dataset.val === 'on'));
   }
 
   renderPlayerOptions();
-  updateModeUI(); // チーム関連欄の初期表示
+  updateModeUI();
 
   document.getElementById('start-btn').addEventListener('click', startGame);
 
-  // 画面サイズ・向きが変わったら盤面サイズを再計算
+  // 画面サイズ変更時に盤面リフィット
   const refit = () => { if (UI.game) UI.fitBoard(); };
   window.addEventListener('resize', refit);
   window.addEventListener('orientationchange', refit);
 
-  // サウンド切替（🔊/🔇）
+  // サウンドミュートボタン（HUD）
   document.getElementById('sound-btn').addEventListener('click', e => {
     const muted = Sound.toggleMute();
     e.currentTarget.textContent = muted ? '🔇' : '🔊';
     e.currentTarget.classList.toggle('muted', muted);
   });
 
-  // メニュー
+  // メニューボタン
   document.getElementById('menu-btn').addEventListener('click',
     () => showOverlay('メニュー', '', false));
+
+  // メニュー内：ゲームに戻る
   document.getElementById('overlay-resume').addEventListener('click', hideOverlay);
+
+  // メニュー内：設定画面に戻る
   document.getElementById('overlay-restart').addEventListener('click', () => {
-    UI.clearCpuTimer(); // 予約中のCPU動作を停止
-    Sound.stopBGM();    // BGM停止
+    UI.clearCpuTimer();
+    Sound.stopBGM();
     hideOverlay();
     showScreen('setup-screen');
   });
 
-  // Service Worker 登録（完全オフライン対応。https/localhostでのみ動作）
+  // 勝利後：もう一度（同設定）
+  document.getElementById('overlay-rematch').addEventListener('click', () => {
+    hideOverlay();
+    startGame();
+  });
+
+  // メニュー内：SE トグル
+  document.getElementById('menu-se-btn').addEventListener('click', () => {
+    setupState.se = !setupState.se;
+    Sound.setSE(setupState.se);
+    updateMenuToggles();
+  });
+
+  // メニュー内：BGM トグル
+  document.getElementById('menu-bgm-btn').addEventListener('click', () => {
+    setupState.bgm = !setupState.bgm;
+    Sound.setBGM(setupState.bgm);
+    updateMenuToggles();
+  });
+
+  // メニュー内：遊び方
+  document.getElementById('menu-guide-btn').addEventListener('click', () => {
+    hideOverlay();
+    showGuide();
+  });
+
+  // 設定画面：遊び方ボタン
+  document.getElementById('guide-open-btn').addEventListener('click', showGuide);
+  document.getElementById('guide-close-btn').addEventListener('click', hideGuide);
+
+  // Service Worker 登録
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js').catch(() => {});
