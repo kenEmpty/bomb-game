@@ -7,22 +7,22 @@
  * アセット更新時は CACHE 名と各URLの ?v= を上げること（index.html と揃える）。
  * ========================================================================= */
 
-const CACHE = 'bombgame-v10';
+const CACHE = 'bombgame-v11';
 
 // 先読みキャッシュ対象（index.html が参照するURLと一致させる）
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './style.css?v=10',
-  './js/config.js?v=10',
-  './js/skins.js?v=10',
-  './js/shop.js?v=10',
-  './js/game.js?v=10',
-  './js/cpu.js?v=10',
-  './js/audio.js?v=10',
-  './js/ui.js?v=10',
-  './js/main.js?v=10',
+  './style.css?v=11',
+  './js/config.js?v=11',
+  './js/skins.js?v=11',
+  './js/shop.js?v=11',
+  './js/game.js?v=11',
+  './js/cpu.js?v=11',
+  './js/audio.js?v=11',
+  './js/ui.js?v=11',
+  './js/main.js?v=11',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',

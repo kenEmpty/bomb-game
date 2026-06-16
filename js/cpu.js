@@ -27,6 +27,19 @@ const CPU = {
     ALLY_BLOCK: 20,    // チーム戦：味方の逃げ道を1つ塞ぐごとに減点
   },
 
+  // Expertの評価重み（BFS生存エリア・2ターン先読み・撃破期待値）
+  EXPERT_WEIGHTS: {
+    NEXT_ATTACK:   1200, // 即座に撃たれる位置への大ペナルティ
+    FUTURE_ATTACK:  500, // 2手先に敵が移動後に撃てる位置へのペナルティ
+    MULTI_ATTACK:   180, // 複数の敵に同時に狙われる追加ペナルティ
+    ALLY_TRAP:      250, // 味方を閉じ込める大ペナルティ
+    ALLY_BLOCK:      25, // 味方の逃げ道を塞ぐペナルティ
+    SURV_AREA:        9, // BFS生存エリア1マスごとの加点
+    KILL_EXPECT:     18, // 撃破期待値の加点係数
+    OPP_SURV_AREA:    1, // 敵の生存エリア1マスごとの減点
+    ENDGAME_BOOST:  3.0, // 終盤（残り2人以下）の撃破評価乗数
+  },
+
   /* 爆弾の投げ先を決める。{r,c} を返す（必ず getBombTargets() の中から選ぶ） */
   decideBomb(game) {
     const self = game.currentPlayer;
@@ -37,6 +50,9 @@ const CPU = {
     switch (self.difficulty) {
       case 'easy':
         return cpuPick(targets);
+
+      case 'expert':
+        return CPU._expertBomb(game, self, targets);
 
       case 'hard':
         return CPU._hardBomb(game, self, targets);
@@ -61,6 +77,9 @@ const CPU = {
     switch (self.difficulty) {
       case 'easy':
         return cpuPick(targets);
+
+      case 'expert':
+        return CPU._expertStep(game, self, targets);
 
       case 'hard':
         return CPU._hardStep(game, self, targets);
@@ -201,6 +220,158 @@ const CPU = {
     return CPU._safeBomb(game, self, targets);
   },
 
+  /* ---- Expert移動：BFS生存エリア＋2ターン先読み＋撃破期待で評価 ---- */
+  _expertStep(game, self, targets) {
+    if (CPU._plan && CPU._plan.id === self.id && CPU._plan.queue.length === game.movesLeft) {
+      const next = CPU._plan.queue.shift();
+      if (targets.some(t => t.r === next.r && t.c === next.c)) return next;
+    }
+
+    const paths = enumeratePaths(game, self);
+    if (!paths.length) return cpuPick(targets);
+
+    const uniq = new Map();
+    for (const p of paths) {
+      const k = key(p.end.r, p.end.c);
+      if (!uniq.has(k)) uniq.set(k, p);
+    }
+
+    // 次の敵の到達可能終点を事前計算（1回だけ）して2ターン先読みに使う
+    const nextEnemy = nextEnemyAttacker(game, self);
+    const nextEnemyEnds = nextEnemy ? enumerateReachableEnds(game, nextEnemy) : [];
+    const aliveCount = game.players.filter(p => p.alive).length;
+
+    const scored = [...uniq.values()].map(p => {
+      const e = CPU._evalEndExpert(game, p.end, self, nextEnemyEnds, aliveCount);
+      return { path: p.path, end: p.end, ...e };
+    });
+
+    let best = -Infinity, pool = [];
+    for (const s of scored) {
+      if (s.score > best) { best = s.score; pool = [s]; }
+      else if (s.score === best) pool.push(s);
+    }
+    const chosen = cpuPick(pool);
+    CPU._plan = { id: self.id, queue: chosen.path.slice() };
+
+    if (CPU.debug) CPU._recordDebugExpert(self, scored, chosen, aliveCount);
+
+    return CPU._plan.queue.shift();
+  },
+
+  /* Expert終点評価（BFS生存エリア・2ターン先読み・撃破期待値・終盤加速） */
+  _evalEndExpert(game, end, self, nextEnemyEnds, aliveCount) {
+    const EW = CPU.EXPERT_WEIGHTS;
+    const enemies = enemiesOf(game, self);
+    const allies = alliesOf(game, self);
+    const nextEnemy = nextEnemyAttacker(game, self);
+
+    // 現在位置から即座に撃たれるか
+    const attackers = enemies.filter(p => canBombReach(p.r, p.c, end.r, end.c));
+    const nextCanAttack = !!nextEnemy && canBombReach(nextEnemy.r, nextEnemy.c, end.r, end.c);
+
+    // 2ターン先：次の敵が移動後にここを狙えるか
+    const nextCanReachToAttack = !nextCanAttack &&
+      nextEnemyEnds.some(e => canBombReach(e.r, e.c, end.r, end.c));
+
+    // BFS生存エリア（4歩先まで到達できるマス数）
+    const survArea = survivalArea(game, end.r, end.c, self.id, 4);
+
+    // 撃破期待値（ここから狙える敵の逃げ場の少なさ）
+    const isEndgame = aliveCount <= 2;
+    const killExpect = expertKillExpect(game, end.r, end.c, self);
+    const endgameMult = isEndgame ? EW.ENDGAME_BOOST : 1.0;
+
+    // 敵の生存エリア合計（自分の位置が敵に与える間接圧力の参考値）
+    let oppSurvSum = 0;
+    for (const p of enemies) oppSurvSum += survivalArea(game, p.r, p.c, p.id, 3);
+
+    // 味方への影響
+    let allyBlock = 0, allyTrap = 0;
+    for (const a of allies) {
+      if (chebyshev(end.r, end.c, a.r, a.c) === 1 && cellFree(game, end.r, end.c, a.id)) {
+        allyBlock++;
+        if (survivalArea(game, a.r, a.c, a.id, 2) - 1 <= 0) allyTrap++;
+      }
+    }
+
+    let score = 0;
+    if (nextCanAttack)          score -= EW.NEXT_ATTACK;
+    if (nextCanReachToAttack)   score -= EW.FUTURE_ATTACK;
+    score -= EW.MULTI_ATTACK  * attackers.length;
+    score -= EW.ALLY_TRAP     * allyTrap;
+    score -= EW.ALLY_BLOCK    * allyBlock;
+    score += EW.SURV_AREA     * survArea;
+    score += EW.KILL_EXPECT   * killExpect * endgameMult;
+    score -= EW.OPP_SURV_AREA * oppSurvSum;
+
+    let reason;
+    if (nextCanAttack)               reason = '脅威回避(即)';
+    else if (nextCanReachToAttack)   reason = '脅威回避(2手)';
+    else if (isEndgame && killExpect > 0) reason = '終盤撃破狙い';
+    else if (killExpect > 0)         reason = '撃破期待';
+    else if (survArea >= 8)          reason = '生存エリア確保';
+    else                             reason = '安全移動';
+
+    return { score, nextCanAttack, atkCount: attackers.length,
+      survArea, killExpect, oppSurvSum, allyBlock, allyTrap,
+      nextCanReachToAttack, reason };
+  },
+
+  /* Expertデバッグ記録 */
+  _recordDebugExpert(self, scored, chosen, aliveCount) {
+    const cells = scored.map(s => ({
+      r: s.end.r, c: s.end.c, score: Math.round(s.score),
+      nextAtk: s.nextCanAttack, futureAtk: s.nextCanReachToAttack,
+      atk: s.atkCount, survArea: s.survArea,
+      killExpect: s.killExpect, reason: s.reason,
+      chosen: s.end.r === chosen.end.r && s.end.c === chosen.end.c,
+    }));
+    CPU.lastEval = { id: self.id, order: self.order, cells, isExpert: true };
+    console.groupCollapsed(`[CPU Expert] P${self.order} 移動評価（${cells.length}候補, 最高=${Math.round(chosen.score)}, 残り${aliveCount}人）`);
+    console.table(cells.map(c => ({
+      行: c.r, 列: c.c, スコア: c.score, 生存エリア: c.survArea,
+      撃破期待: c.killExpect, 理由: c.reason, 採用: c.chosen,
+    })));
+    console.groupEnd();
+  },
+
+  /* ---- Expert爆弾：生存エリア削減重視。終盤は撃破最優先 ---- */
+  _expertBomb(game, self, targets) {
+    const aliveCount = game.players.filter(p => p.alive).length;
+    const isEndgame = aliveCount <= 2;
+
+    // ① 倒せる敵 → 生存エリア最小の敵（最も追い詰められた敵）を優先
+    const kills = targets.filter(t => isEnemyCell(game, t.r, t.c, self));
+    if (kills.length) {
+      return bestBy(kills, t => {
+        const victim = game.playerAt(t.r, t.c);
+        let s = -survivalArea(game, t.r, t.c, victim.id, 3);
+        if (threatensAlly(game, victim, self)) s += 5;
+        if (isEndgame) s += 30;
+        return s;
+      });
+    }
+
+    // ② 敵の生存エリアを最も削れる位置を爆撃する
+    const enemies = enemiesOf(game, self);
+    let bestGain = 0, bestTarget = null;
+    for (const t of targets) {
+      if (game.grid[t.r][t.c] !== CELL.NORMAL || game.playerAt(t.r, t.c)) continue;
+      let totalGain = 0;
+      for (const e of enemies) {
+        const before = survivalArea(game, e.r, e.c, e.id, 3);
+        const after  = survivalAreaAfterBomb(game, t.r, t.c, e.r, e.c, e.id, 3);
+        totalGain += Math.max(0, before - after);
+      }
+      if (totalGain > bestGain) { bestGain = totalGain; bestTarget = t; }
+    }
+    if (bestTarget) return bestTarget;
+
+    // ③ 安全投擲
+    return CPU._safeBomb(game, self, targets);
+  },
+
   /* 自分の隣接マス（＝逃げ道）を壊さない、効果のある投擲先を選ぶ */
   _safeBomb(game, self, targets) {
     let pool = targets.filter(t => game.grid[t.r][t.c] === CELL.NORMAL);
@@ -323,6 +494,78 @@ function enumeratePaths(game, self) {
 
   dfs(self.r, self.c, baseVisited, game.movesLeft, []);
   return results;
+}
+
+// BFS で (r,c) から maxSteps 歩以内に到達できるマス数（壊れていないマスを計上）
+function survivalArea(game, r, c, selfId, maxSteps) {
+  const visited = new Set();
+  visited.add(key(r, c));
+  let frontier = [{ r, c }];
+  for (let step = 0; step < maxSteps && frontier.length > 0; step++) {
+    const next = [];
+    for (const pos of frontier) {
+      for (const d of CONFIG.DIRS_8) {
+        const nr = pos.r + d.dr, nc = pos.c + d.dc, k = key(nr, nc);
+        if (visited.has(k)) continue;
+        if (!game.inField(nr, nc) || game.grid[nr][nc] === CELL.DESTROYED) continue;
+        visited.add(k);
+        next.push({ r: nr, c: nc });
+      }
+    }
+    frontier = next;
+  }
+  return visited.size - 1; // 自分のいるマスを除く
+}
+
+// 爆弾で bombR,bombC を破壊した場合に evalR,evalC の生存エリアがどう変わるか評価
+function survivalAreaAfterBomb(game, bombR, bombC, evalR, evalC, evalId, maxSteps) {
+  const orig = game.grid[bombR][bombC];
+  game.grid[bombR][bombC] = CELL.DESTROYED;
+  const area = survivalArea(game, evalR, evalC, evalId, maxSteps);
+  game.grid[bombR][bombC] = orig;
+  return area;
+}
+
+// player が CONFIG.MOVE_STEPS 歩で到達できる終点を全列挙（経路は省略、重複なし）
+function enumerateReachableEnds(game, player) {
+  const allowRevisit = game.settings.allowRevisit;
+  const startR = player.r, startC = player.c;
+  const endMap = new Map();
+  const baseVisited = new Set([key(startR, startC)]);
+
+  function dfs(r, c, visited, remaining) {
+    if (remaining === 0) {
+      const k = key(r, c);
+      if (!endMap.has(k)) endMap.set(k, { r, c });
+      return;
+    }
+    for (const d of CONFIG.DIRS_8) {
+      const nr = r + d.dr, nc = c + d.dc;
+      if (!game.inField(nr, nc) || game.grid[nr][nc] === CELL.DESTROYED) continue;
+      const occ = game.playerAt(nr, nc);
+      if (occ && occ.id !== player.id && remaining === 1) continue;
+      if (remaining === 1 && nr === startR && nc === startC) continue;
+      const k = key(nr, nc);
+      if (!allowRevisit && visited.has(k)) continue;
+      let nv = visited;
+      if (!allowRevisit) { nv = new Set(visited); nv.add(k); }
+      dfs(nr, nc, nv, remaining - 1);
+    }
+  }
+
+  dfs(startR, startC, baseVisited, CONFIG.MOVE_STEPS);
+  return [...endMap.values()];
+}
+
+// (r,c) から爆弾で狙える敵のうち、生存エリアが少ない敵ほど高スコア（撃破期待値）
+function expertKillExpect(game, r, c, self) {
+  let score = 0;
+  for (const enemy of enemiesOf(game, self)) {
+    if (!canBombReach(r, c, enemy.r, enemy.c)) continue;
+    const sa = survivalArea(game, enemy.r, enemy.c, enemy.id, 3);
+    score += Math.max(0, 8 - sa);
+  }
+  return score;
 }
 
 // チェビシェフ距離（8方向の歩数）

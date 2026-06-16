@@ -15,11 +15,13 @@ function awardMatchPoints(result) {
     easy:   { win: 3,  lose: 1 },
     normal: { win: 5,  lose: 2 },
     hard:   { win: 10, lose: 3 },
+    expert: { win: 15, lose: 4 },
   };
 
   const cpuDiffs = game.players.filter(p => p.isCPU).map(p => p.difficulty);
   let diff = 'normal';
-  if (cpuDiffs.includes('hard'))   diff = 'hard';
+  if (cpuDiffs.includes('expert'))      diff = 'expert';
+  else if (cpuDiffs.includes('hard'))   diff = 'hard';
   else if (cpuDiffs.includes('normal')) diff = 'normal';
   else if (cpuDiffs.includes('easy'))   diff = 'easy';
   const table = TABLES[diff];
@@ -175,10 +177,10 @@ function renderPlayerOptions() {
     if (conf.isCPU) {
       const diffSeg = document.createElement('div');
       diffSeg.className = 'seg mini';
-      ['easy', 'normal', 'hard'].forEach(d => {
+      ['easy', 'normal', 'hard', 'expert'].forEach(d => {
         const b = document.createElement('button');
         b.className = 'seg-btn' + (conf.difficulty === d ? ' active' : '');
-        b.textContent = { easy: 'Easy', normal: 'Normal', hard: 'Hard' }[d];
+        b.textContent = { easy: 'Easy', normal: 'Normal', hard: 'Hard', expert: 'Expert' }[d];
         b.addEventListener('click', () => { conf.difficulty = d; renderPlayerOptions(); });
         diffSeg.appendChild(b);
       });

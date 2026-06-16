@@ -314,6 +314,7 @@ html, body {
   pointer-events: none;
 }
 .cpu-dbg.danger { color: #ff6b6b; }          /* 次の相手に撃たれる位置 */
+.cpu-dbg.expert { white-space: pre; font-size: 0.45rem; line-height: 1.1; } /* Expert拡張表示 */
 .cpu-dbg.chosen {                            /* 実際に選んだ終点 */
   color: #fff;
   background: rgba(46, 196, 182, 0.85);
