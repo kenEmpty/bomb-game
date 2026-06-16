@@ -5,9 +5,8 @@
 
 const Shop = {
   render() {
-    const pts    = SkinStore.getPoints();
-    const owned  = SkinStore.getOwned();
-    const active = SkinStore.getActive();
+    const pts   = SkinStore.getPoints();
+    const owned = SkinStore.getOwned();
 
     document.getElementById('shop-points').textContent = pts.toLocaleString() + ' pt';
 
@@ -16,19 +15,16 @@ const Shop = {
 
     for (const def of SKIN_DEFS) {
       const isOwned   = owned.includes(def.id);
-      const isActive  = active === def.id;
       const canAfford = pts >= def.price;
 
       const previewColor = CONFIG.PLAYER_COLORS[0];
       const card = document.createElement('div');
-      card.className = 'skin-card' + (isActive ? ' skin-active' : '');
+      card.className = 'skin-card' + (isOwned ? ' skin-active' : '');
 
-      /* アクションボタン */
+      /* アクションボタン（購入のみ。スキン選択はホーム画面のプレイヤー設定で行う） */
       let actionHtml;
-      if (isActive) {
-        actionHtml = `<button class="seg-btn active" disabled>使用中</button>`;
-      } else if (isOwned) {
-        actionHtml = `<button class="shop-use-btn seg-btn" data-id="${def.id}">使用する</button>`;
+      if (isOwned) {
+        actionHtml = `<button class="seg-btn active" disabled>所持済み</button>`;
       } else if (canAfford) {
         actionHtml = `<button class="shop-buy-btn primary-btn shop-sm-btn" data-id="${def.id}">${def.price.toLocaleString()}pt<br><small>で購入</small></button>`;
       } else {
@@ -55,22 +51,13 @@ const Shop = {
         <div class="skin-action">${actionHtml}</div>
       `;
 
-      card.querySelector('.shop-use-btn')?.addEventListener('click', () => this.onUse(def.id));
       card.querySelector('.shop-buy-btn')?.addEventListener('click', () => this.onBuy(def.id));
 
       grid.appendChild(card);
     }
   },
 
-  onUse(skinId) {
-    SkinStore.setActive(skinId);
-    this.render();
-  },
-
   onBuy(skinId) {
-    if (SkinStore.purchase(skinId)) {
-      SkinStore.setActive(skinId);
-      this.render();
-    }
+    if (SkinStore.purchase(skinId)) this.render();
   },
 };

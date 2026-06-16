@@ -228,9 +228,15 @@ const SkinStore = (() => {
         points: typeof d.points === 'number' ? d.points : 0,
         owned:  Array.isArray(d.owned) ? d.owned : ['default'],
         active: typeof d.active === 'string' ? d.active : 'default',
+        playerSkins: Array.isArray(d.playerSkins)
+          ? d.playerSkins
+          : ['default', 'default', 'default', 'default'],
       };
     } catch {
-      return { points: 0, owned: ['default'], active: 'default' };
+      return {
+        points: 0, owned: ['default'], active: 'default',
+        playerSkins: ['default', 'default', 'default', 'default'],
+      };
     }
   }
 
