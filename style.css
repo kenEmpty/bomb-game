@@ -33,6 +33,33 @@ html, body {
   user-select: none;
 }
 
+/* ---- 開発モードバッジ（?dev=1 のときだけ表示） ---- */
+.dev-badge {
+  display: none;
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  color: #14142b;
+  background: #ffd24a;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+body.dev-mode .dev-badge { display: block; }
+
+.shop-hint.dev-hint {
+  color: #14142b;
+  background: #ffd24a;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
 /* ---- 画面切り替え ---- */
 .screen { display: none; height: 100%; }
 .screen.active { display: flex; flex-direction: column; }

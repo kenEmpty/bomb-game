@@ -10,6 +10,15 @@ const Shop = {
 
     document.getElementById('shop-points').textContent = pts.toLocaleString() + ' pt';
 
+    // 開発モード中はショップ上部に「全スキン試着中」を表示
+    const hint = document.querySelector('#shop-screen .shop-hint');
+    if (hint) {
+      hint.classList.toggle('dev-hint', SkinStore.isDev());
+      hint.innerHTML = SkinStore.isDev()
+        ? '🛠 開発モード：全スキン試着中（購入不要・本番データは変更されません）'
+        : 'ゲームで勝利・参加するとポイントが貯まります<br>購入したスキンはホーム画面の各プレイヤー設定で選べます';
+    }
+
     const grid = document.getElementById('shop-grid');
     grid.innerHTML = '';
 

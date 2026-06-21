@@ -220,6 +220,12 @@ const SKIN_DEFS = [
  * SkinStore: ポイント・所持スキン・選択スキンの永続化
  * =================================================================== */
 const SkinStore = (() => {
+  // 開発モード（URLに ?dev=1）。全スキン試着・ポイント非消費。
+  // 本番localStorageは一切書き換えず、スキン選択はメモリ上だけで保持する。
+  let DEV = false;
+  let devPlayerSkins = null;          // 開発モード中のプレイヤー別スキン（メモリのみ）
+  const allIds = () => SKIN_DEFS.map(s => s.id);
+
   function load() {
     try {
       const raw = localStorage.getItem(SKIN_STORE_KEY);
@@ -245,8 +251,19 @@ const SkinStore = (() => {
   }
 
   return {
+    /* 開発モード：URLに ?dev=1 のとき main.js から有効化する。
+     * 全スキンを一時解放し、選択はメモリ上だけで扱う（本番データ不変）。 */
+    isDev() { return DEV; },
+    enableDev() {
+      DEV = true;
+      const d = load();
+      devPlayerSkins = Array.isArray(d.playerSkins)
+        ? d.playerSkins.slice()
+        : ['default', 'default', 'default', 'default'];
+    },
+
     getPoints()    { return load().points; },
-    getOwned()     { return load().owned; },
+    getOwned()     { return DEV ? allIds() : load().owned; },
     getActive()    { return load().active; },
 
     getSkinDef(id) {
@@ -256,13 +273,23 @@ const SkinStore = (() => {
       return this.getSkinDef(this.getActive());
     },
 
-    /* プレイヤー個別スキン（index: 0-3） */
+    /* プレイヤー個別スキン（index: 0-3）。開発モード中はメモリ上の値を使う。 */
     getPlayerSkin(index) {
+      if (DEV) {
+        const id = devPlayerSkins && devPlayerSkins[index];
+        return (id && allIds().includes(id)) ? id : 'default';
+      }
       const d = load();
       const id = d.playerSkins && d.playerSkins[index];
       return (id && (d.owned || ['default']).includes(id)) ? id : 'default';
     },
     setPlayerSkin(index, skinId) {
+      if (DEV) {
+        if (!allIds().includes(skinId)) return false;
+        if (!devPlayerSkins) devPlayerSkins = ['default', 'default', 'default', 'default'];
+        devPlayerSkins[index] = skinId; // メモリのみ：localStorageは触らない
+        return true;
+      }
       const d = load();
       if (!(d.owned || ['default']).includes(skinId)) return false;
       if (!d.playerSkins) d.playerSkins = ['default', 'default', 'default', 'default'];
@@ -275,14 +302,16 @@ const SkinStore = (() => {
     },
 
     addPoints(n) {
+      if (DEV) return load().points; // 開発モードでは残高を変更しない
       const d = load();
       d.points = Math.max(0, d.points + n);
       save(d);
       return d.points;
     },
 
-    /* 購入：所持済み・pt不足なら false */
+    /* 購入：所持済み・pt不足なら false。開発モードでは全解放済みのため何もしない。 */
     purchase(skinId) {
+      if (DEV) return false; // 本番データ（owned/points）を変更しない
       const def = SKIN_DEFS.find(s => s.id === skinId);
       if (!def) return false;
       const d = load();
@@ -296,6 +325,7 @@ const SkinStore = (() => {
 
     /* 使用スキン変更：未所持なら false */
     setActive(skinId) {
+      if (DEV) return false; // 開発モードでは本番データを変更しない
       const d = load();
       if (!d.owned.includes(skinId)) return false;
       d.active = skinId;

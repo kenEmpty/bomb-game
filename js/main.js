@@ -420,6 +420,12 @@ function hideGuide() {
 
 /* ---- 起動時のイベント登録 ----------------------------------------- */
 window.addEventListener('DOMContentLoaded', () => {
+  // 開発モード（?dev=1）：全スキン試着・ポイント非消費。本番データは変更しない。
+  if (new URLSearchParams(location.search).get('dev') === '1') {
+    SkinStore.enableDev();
+    document.body.classList.add('dev-mode');
+  }
+
   // 無料スキンを自動解放（price=0 は最初から所持）
   SKIN_DEFS.filter(s => s.price === 0).forEach(s => SkinStore.purchase(s.id));
 
