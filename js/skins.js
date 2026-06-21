@@ -47,7 +47,7 @@ const SKIN_DEFS = [
     id: 'ninja',
     name: '忍者',
     desc: '手裏剣・煙幕爆発・残像演出',
-    price: 100,
+    price: 150,
     drawCharacter(color, num) {
       return `<svg viewBox="0 0 100 100" class="stick" xmlns="http://www.w3.org/2000/svg">
         <path d="M32 16 Q32 6 50 6 Q68 6 68 16 L70 30 Q60 26 50 26 Q40 26 30 30 Z" fill="#2a2a50"/>
@@ -130,7 +130,7 @@ const SKIN_DEFS = [
     id: 'robot',
     name: 'ロボット',
     desc: 'エネルギー球・電撃爆発・スキャン演出',
-    price: 250,
+    price: 150,
     drawCharacter(color, num) {
       return `<svg viewBox="0 0 100 100" class="stick" xmlns="http://www.w3.org/2000/svg">
         <line x1="50" y1="5" x2="50" y2="13" stroke="#aaa" stroke-width="3" stroke-linecap="round"/>
@@ -167,6 +167,7 @@ const SKIN_DEFS = [
       sparkGlow: '#0af',
       debrisBg:  '#1a2a4a',
     },
+    explosionSound: 'energy', // エネルギー弾の放電音
     victoryEmojis: ['⚡', '🤖', '💡', '🔷', '✨'],
   },
 
@@ -175,7 +176,7 @@ const SKIN_DEFS = [
     id: 'king',
     name: '王様',
     desc: '王冠爆弾・黄金爆発・王者演出',
-    price: 400,
+    price: 150,
     drawCharacter(color, num) {
       return `<svg viewBox="0 0 100 100" class="stick" xmlns="http://www.w3.org/2000/svg">
         <polygon points="24,23 24,9 38,17 50,7 62,17 76,9 76,23" fill="#f0c030" stroke="#b89000" stroke-width="1.5"/>
@@ -205,13 +206,15 @@ const SKIN_DEFS = [
       spin: true,
     },
     explosionTheme: {
-      flash:     'radial-gradient(circle, rgba(255,255,210,0.98) 0%, rgba(255,220,60,0.6) 40%, rgba(200,140,0,0) 70%)',
-      core:      'radial-gradient(circle, #fff 0%, #ffd24a 35%, #f0a000 70%, rgba(180,80,0,0) 100%)',
-      ringColor: 'rgba(255,200,30,0.9)',
-      sparkBg:   'radial-gradient(circle, #fff, #ffd24a 60%, #f0a000)',
-      sparkGlow: '#ffc040',
-      debrisBg:  '#4a3810',
+      // デフォルトの橙と差別化するため、純度の高い「黄金」に振る（白金コア＋濃い琥珀）
+      flash:     'radial-gradient(circle, rgba(255,252,220,1) 0%, rgba(255,230,90,0.85) 35%, rgba(255,195,0,0) 70%)',
+      core:      'radial-gradient(circle, #fffef2 0%, #fff06a 30%, #ffcf1e 60%, rgba(200,120,0,0) 100%)',
+      ringColor: 'rgba(255,225,70,1)',
+      sparkBg:   'radial-gradient(circle, #fff, #ffe96a 55%, #ffb800)',
+      sparkGlow: '#ffe23a',
+      debrisBg:  '#6b5210',
     },
+    explosionSound: 'royal', // 黄金のきらめきを重ねた豪華な爆発音
     victoryEmojis: ['👑', '🌟', '✨', '💛', '🏆'],
   },
 ];

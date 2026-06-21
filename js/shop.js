@@ -67,6 +67,10 @@ const Shop = {
   },
 
   onBuy(skinId) {
-    if (SkinStore.purchase(skinId)) this.render();
+    if (SkinStore.purchase(skinId)) {
+      const newly = AchievementStore.onPurchase();
+      if (newly.length) Sound.play('achievement');
+      this.render();
+    }
   },
 };

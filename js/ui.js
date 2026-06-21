@@ -328,19 +328,19 @@ const UI = {
 
     setTimeout(() => {
       if (victim) {
-        this.fxKill(target.r, target.c, isFinal, skin.explosionTheme);
+        this.fxKill(target.r, target.c, isFinal, skin.explosionTheme, skin.explosionSound);
       } else {
         this.fxExplode(target.r, target.c, 0, skin.explosionTheme);
-        Sound.play('explode');
+        Sound.playExplosion(0, skin.explosionSound);
       }
     }, dur);
   },
 
   /* プレイヤー撃破の共通演出：爆発 → シェイク → KO。最終なら大爆発＋強シェイク後に勝利画面。
    * 爆弾命中・行動不能（投げ場/移動先なし）どちらの脱落でも使う。 */
-  fxKill(r, c, isFinal, theme) {
+  fxKill(r, c, isFinal, theme, soundProfile) {
     this.fxExplode(r, c, isFinal ? 2 : 1, theme);
-    Sound.play(isFinal ? 'boomBig' : 'boom');
+    Sound.playExplosion(isFinal ? 2 : 1, soundProfile);
     this.shake(isFinal ? 'strong' : 'normal');
     this.fxKO(r, c, isFinal);
     if (isFinal) setTimeout(() => this._runWin(), 400 + 500); // 強シェイク→0.5s静止→勝利

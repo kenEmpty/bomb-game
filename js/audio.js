@@ -109,6 +109,11 @@ const Sound = {
       case 'explode':  this._boom(0); break; // 通常の地形破壊
       case 'boom':     this._boom(1); break; // プレイヤー撃破（少し大きめ）
       case 'boomBig':  this._boom(2); break; // 最終撃破（大爆発）
+      case 'achievement': { // 実績解除：きらびやかな上昇アルペジオ
+        const notes = [784, 988, 1319, 1568];
+        notes.forEach((f, i) => this._tone(f, t + i * 0.08, 0.25, 'triangle', 0.28));
+        break;
+      }
       case 'step': // 移動：短いクリック
         this._tone(520, t, 0.06, 'square', 0.12);
         break;
@@ -135,49 +140,122 @@ const Sound = {
     }
   },
 
-  /* 爆発音「ドーン/ボーン」。intensity: 0=通常 1=撃破 2=最終撃破 */
+  /* 爆発音の振り分け（スキンの explosionSound に応じて鳴らし分け）。
+   *   profile: undefined/'default'=通常爆発, 'energy'=ロボット, 'royal'=王様 */
+  playExplosion(intensity, profile) {
+    if (!this.enabledSE || !this.ctx) return;
+    if (profile === 'energy')     this._energyBoom(intensity);
+    else if (profile === 'royal') this._royalBoom(intensity);
+    else                          this._boom(intensity);
+  },
+
+  /* 爆発音「ドーン/ボーン」。intensity: 0=通常 1=撃破 2=最終撃破。
+   * 迫力を増すため、鋭い初撃クラック＋低音の二重掃引＋長い余韻で構成する。 */
   _boom(intensity) {
     if (!this.enabledSE || !this.ctx) return;
     const ctx = this.ctx, t = ctx.currentTime;
-    const dur = [0.45, 0.6, 0.85][intensity];
-    const vol = [0.8, 1.0, 1.0][intensity];
+    const dur = [0.55, 0.75, 1.05][intensity];
+    const vol = [0.95, 1.15, 1.25][intensity];
 
-    // 破裂音（ホワイトノイズ＋ローパス掃引）
-    const src = this._noise(dur * 0.7);
+    // ① 初撃クラック（ハイパス通過の鋭いノイズ＝「バッ」という立ち上がり）
+    const crack = this._noise(0.06);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 1800;
+    const cg = ctx.createGain();
+    cg.gain.setValueAtTime(vol * 0.9, t);
+    cg.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    crack.connect(hp); hp.connect(cg); cg.connect(this.master);
+    crack.start(t); crack.stop(t + 0.07);
+
+    // ② 破裂音（ホワイトノイズ＋ローパス掃引）
+    const src = this._noise(dur * 0.75);
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(1800, t);
-    lp.frequency.exponentialRampToValueAtTime(120, t + dur * 0.5);
+    lp.frequency.setValueAtTime(2600, t);
+    lp.frequency.exponentialRampToValueAtTime(110, t + dur * 0.55);
     const ng = ctx.createGain();
     ng.gain.setValueAtTime(vol, t);
-    ng.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.7);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.75);
     src.connect(lp); lp.connect(ng); ng.connect(this.master);
-    src.start(t); src.stop(t + dur * 0.7);
+    src.start(t); src.stop(t + dur * 0.75);
 
-    // 低音の「ドーン」（サイン下降）
-    const f0 = [150, 130, 120][intensity], f1 = [45, 38, 30][intensity];
+    // ③ 低音の「ドーン」（サイン下降）
+    const f0 = [165, 145, 130][intensity], f1 = [42, 35, 26][intensity];
     const o = ctx.createOscillator(); o.type = 'sine';
     o.frequency.setValueAtTime(f0, t);
     o.frequency.exponentialRampToValueAtTime(f1, t + dur);
     const og = ctx.createGain();
     og.gain.setValueAtTime(0.0001, t);
-    og.gain.exponentialRampToValueAtTime(vol * 0.9, t + 0.02);
+    og.gain.exponentialRampToValueAtTime(vol, t + 0.02);
     og.gain.exponentialRampToValueAtTime(0.001, t + dur);
     o.connect(og); og.connect(this.master);
     o.start(t); o.stop(t + dur + 0.05);
 
-    // 撃破時はサブ低音を重ねて厚みを出す
-    if (intensity > 0) {
-      const o2 = ctx.createOscillator(); o2.type = 'triangle';
-      o2.frequency.setValueAtTime(f0 / 2, t);
-      o2.frequency.exponentialRampToValueAtTime(f1 / 2, t + dur);
-      const o2g = ctx.createGain();
-      o2g.gain.setValueAtTime(0.0001, t);
-      o2g.gain.exponentialRampToValueAtTime(vol * 0.5, t + 0.03);
-      o2g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      o2.connect(o2g); o2g.connect(this.master);
-      o2.start(t); o2.stop(t + dur + 0.05);
-    }
+    // ④ サブ低音（厚み）。通常爆発でも軽く重ねて迫力を底上げ
+    const o2 = ctx.createOscillator(); o2.type = 'triangle';
+    o2.frequency.setValueAtTime(f0 / 2, t);
+    o2.frequency.exponentialRampToValueAtTime(f1 / 2, t + dur);
+    const o2g = ctx.createGain();
+    o2g.gain.setValueAtTime(0.0001, t);
+    o2g.gain.exponentialRampToValueAtTime(vol * (intensity > 0 ? 0.6 : 0.4), t + 0.03);
+    o2g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o2.connect(o2g); o2g.connect(this.master);
+    o2.start(t); o2.stop(t + dur + 0.05);
+  },
+
+  /* ロボット：エネルギー弾が炸裂したような電子音。
+   * 下降するサイン掃引（ズーン）＋バンドパスノイズ（シュワッ）＋金属的な高音。 */
+  _energyBoom(intensity) {
+    if (!this.enabledSE || !this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const dur = [0.5, 0.65, 0.9][intensity];
+    const vol = [0.85, 1.05, 1.2][intensity];
+
+    // ① エネルギー放電（高→低へ急降下するサイン＝「ズゥン」）
+    const o = ctx.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(1400, t);
+    o.frequency.exponentialRampToValueAtTime(70, t + dur * 0.8);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(vol, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    // バンドパスで「ビーム感」を付ける
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 600; bp.Q.value = 2;
+    o.connect(bp); bp.connect(og); og.connect(this.master);
+    o.start(t); o.stop(t + dur + 0.03);
+
+    // ② 放電ノイズ（バンドパス掃引で「シュワワ」）
+    const src = this._noise(dur * 0.6);
+    const bp2 = ctx.createBiquadFilter();
+    bp2.type = 'bandpass'; bp2.Q.value = 1.2;
+    bp2.frequency.setValueAtTime(3000, t);
+    bp2.frequency.exponentialRampToValueAtTime(400, t + dur * 0.5);
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(vol * 0.7, t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.6);
+    src.connect(bp2); bp2.connect(ng); ng.connect(this.master);
+    src.start(t); src.stop(t + dur * 0.6);
+
+    // ③ 金属的な高音の余韻（「キィン」）
+    const ring = ctx.createOscillator(); ring.type = 'square';
+    ring.frequency.setValueAtTime(2200, t);
+    ring.frequency.exponentialRampToValueAtTime(1500, t + dur);
+    const rg = ctx.createGain();
+    rg.gain.setValueAtTime(0.0001, t);
+    rg.gain.exponentialRampToValueAtTime(vol * 0.18, t + 0.02);
+    rg.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    ring.connect(rg); rg.connect(this.master);
+    ring.start(t); ring.stop(t + dur + 0.03);
+  },
+
+  /* 王様：通常の大爆発に、黄金のきらめき（高音アルペジオ）を重ねた豪華版。 */
+  _royalBoom(intensity) {
+    this._boom(intensity);
+    if (!this.enabledSE || !this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    // 上昇するベル風アルペジオ（ファンファーレの一瞬）
+    const notes = [784, 1047, 1319, 1568];
+    notes.forEach((f, i) => this._tone(f, t + 0.03 + i * 0.06, 0.3, 'triangle', 0.22));
   },
 
   /* ---- BGM（簡単なループ曲） --------------------------------------- */

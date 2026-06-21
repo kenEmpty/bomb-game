@@ -890,6 +890,83 @@ body.dev-mode .dev-badge { display: block; }
   margin-left: 5px;
 }
 
+/* =========================================================
+ * 実績画面
+ * ========================================================= */
+#ach-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ach-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 11px 12px;
+  border: 2px solid transparent;
+}
+
+.ach-card.ach-unlocked { border-color: #ffd24a; }
+.ach-card.ach-locked   { opacity: 0.7; }
+
+.ach-icon {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  background: var(--panel-2);
+  border-radius: 12px;
+}
+.ach-card.ach-unlocked .ach-icon { background: rgba(255, 210, 74, 0.16); }
+
+.ach-info { flex: 1; min-width: 0; }
+.ach-name { font-size: 0.98rem; font-weight: bold; line-height: 1.2; }
+.ach-card.ach-locked .ach-name { color: var(--muted); }
+.ach-cond { font-size: 0.72rem; color: var(--muted); margin-top: 3px; line-height: 1.35; }
+
+.ach-reward {
+  flex-shrink: 0;
+  font-size: 1.05rem;
+  font-weight: bold;
+  color: #ffd24a;
+}
+.ach-card.ach-locked .ach-reward { color: var(--muted); }
+.ach-reward small { font-size: 0.62rem; font-weight: normal; }
+
+/* 実績解除トースト（勝敗オーバーレイ内） */
+#overlay-ach:empty { display: none; }
+.ach-toast {
+  margin: 0 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ach-toast-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 210, 74, 0.14);
+  border: 1px solid rgba(255, 210, 74, 0.5);
+  border-radius: 10px;
+  padding: 7px 11px;
+  font-size: 0.82rem;
+  font-weight: bold;
+  color: #ffe08a;
+  animation: ach-pop 0.4s ease-out;
+}
+.ach-toast-pt { color: #ffd24a; flex-shrink: 0; }
+@keyframes ach-pop {
+  0%   { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 /* 爆弾アニメ：no-spin クラスで回転を抑制 */
 .fx-bomb.no-spin { animation: none; }
 

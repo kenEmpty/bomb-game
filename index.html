@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="ボムサバイバル" />
 
-  <link rel="stylesheet" href="style.css?v=15" />
+  <link rel="stylesheet" href="style.css?v=16" />
 </head>
 <body>
   <!-- 開発モード表示（?dev=1 のときのみ表示） -->
@@ -133,6 +133,7 @@
 
       <button id="start-btn" class="primary-btn">ゲーム開始</button>
       <button id="shop-btn" class="ghost-btn">🎨 スキンショップ</button>
+      <button id="ach-btn" class="ghost-btn">🏆 実績</button>
       <button id="guide-open-btn" class="ghost-btn">遊び方を見る</button>
     </div>
   </section>
@@ -150,6 +151,21 @@
     <div class="shop-scroll">
       <div class="shop-hint">ゲームで勝利・参加するとポイントが貯まります<br>購入したスキンはホーム画面の各プレイヤー設定で選べます</div>
       <div id="shop-grid"></div>
+    </div>
+  </section>
+
+  <!-- ===== 実績画面 ===== -->
+  <section id="achievements-screen" class="screen">
+    <div class="shop-header">
+      <button id="ach-back-btn" class="icon-btn" title="戻る">←</button>
+      <h2 class="shop-title">実績</h2>
+      <div class="shop-pts-badge">
+        <span id="ach-progress">0 / 0 解除</span>
+      </div>
+    </div>
+    <div class="shop-scroll">
+      <div class="shop-hint">条件を満たすと自動で解除され、報酬ポイントがもらえます</div>
+      <div id="ach-grid"></div>
     </div>
   </section>
 
@@ -183,6 +199,9 @@
 
       <!-- ポイント獲得表示（勝利時のみ） -->
       <div id="overlay-pts" class="overlay-pts"></div>
+
+      <!-- 実績解除表示（新規解除時のみ） -->
+      <div id="overlay-ach"></div>
 
       <!-- 勝利時のみ：結果サマリー -->
       <div id="overlay-summary"></div>
@@ -244,13 +263,14 @@
     </div>
   </div>
 
-  <script src="js/config.js?v=15"></script>
-  <script src="js/skins.js?v=15"></script>
-  <script src="js/shop.js?v=15"></script>
-  <script src="js/game.js?v=15"></script>
-  <script src="js/cpu.js?v=15"></script>
-  <script src="js/audio.js?v=15"></script>
-  <script src="js/ui.js?v=15"></script>
-  <script src="js/main.js?v=15"></script>
+  <script src="js/config.js?v=16"></script>
+  <script src="js/skins.js?v=16"></script>
+  <script src="js/shop.js?v=16"></script>
+  <script src="js/achievements.js?v=16"></script>
+  <script src="js/game.js?v=16"></script>
+  <script src="js/cpu.js?v=16"></script>
+  <script src="js/audio.js?v=16"></script>
+  <script src="js/ui.js?v=16"></script>
+  <script src="js/main.js?v=16"></script>
 </body>
 </html>

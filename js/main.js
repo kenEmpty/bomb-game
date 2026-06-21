@@ -33,8 +33,18 @@ function awardMatchPoints(result) {
     humanWon = humans.some(p => p.team === result.team.id);
   }
 
-  const earned = humanWon ? table.win : table.lose;
+  // 人数ボーナス：3人対戦は+1、4人対戦は+2（勝敗どちらでも）
+  const countBonus = Math.max(0, game.players.length - 2);
+  const earned = (humanWon ? table.win : table.lose) + countBonus;
   SkinStore.addPoints(earned);
+
+  // 実績：この試合で人間が爆弾撃破した数（killLogは爆弾命中のみ記録）
+  const humanIds = new Set(humans.map(p => p.id));
+  const humanBombKills = killLog.filter(k => humanIds.has(k.killerId)).length;
+  lastEarnedAchievements = AchievementStore.onMatchEnd({
+    won: humanWon, diff, mode: game.settings.mode, humanBombKills,
+  });
+
   return earned;
 }
 
@@ -63,6 +73,7 @@ let game = null;
 let lastResult = null;     // 直前のゲーム勝利結果（サマリー表示用）
 let eliminationOrder = []; // 脱落した順のプレイヤーID
 let killLog = [];          // [{killerId, victimId}]
+let lastEarnedAchievements = []; // 直前の試合で新規解除した実績（オーバーレイ表示用）
 
 /* ---- localStorage 保存・復元 --------------------------------------- */
 function saveSettings() {
@@ -283,6 +294,7 @@ function startGame() {
   eliminationOrder = [];
   killLog = [];
   lastResult = null;
+  lastEarnedAchievements = [];
 
   const settings = {
     size: setupState.size,
@@ -310,8 +322,8 @@ function startGame() {
         const g = UI.game;
         const over = g.settings.mode === 'team' ? g.aliveTeams().length <= 1 : g.aliveCount <= 1;
         if (over) UI.finalKillInProgress = true;
-        const theme = SkinStore.getPlayerSkinDef(p.order - 1).explosionTheme;
-        UI.fxKill(p.r, p.c, over, theme);
+        const def = SkinStore.getPlayerSkinDef(p.order - 1);
+        UI.fxKill(p.r, p.c, over, def.explosionTheme, def.explosionSound);
       }
       const why = reason === 'bomb' ? '爆弾命中' : '行動不能';
       UI.setStatus(`💥 プレイヤー${'①②③④'[p.order - 1]} 脱落（${why}）`);
@@ -379,6 +391,14 @@ function showOverlay(title, msg, isWin, earnedPts) {
     } else {
       ptsEl.innerHTML = '';
     }
+  }
+
+  // 実績解除表示（試合結果オーバーレイのみ。メニューでは出さない）
+  const achEl = document.getElementById('overlay-ach');
+  if (achEl) {
+    const show = isWin && lastEarnedAchievements.length > 0;
+    achEl.innerHTML = show ? Achievements.newlyHtml(lastEarnedAchievements) : '';
+    if (show) setTimeout(() => Sound.play('achievement'), 350);
   }
 
   // 結果サマリー
@@ -460,6 +480,15 @@ window.addEventListener('DOMContentLoaded', () => {
     showScreen('shop-screen');
   });
   document.getElementById('shop-back-btn').addEventListener('click', () => {
+    showScreen('setup-screen');
+  });
+
+  // 実績
+  document.getElementById('ach-btn').addEventListener('click', () => {
+    Achievements.render();
+    showScreen('achievements-screen');
+  });
+  document.getElementById('ach-back-btn').addEventListener('click', () => {
     showScreen('setup-screen');
   });
 
