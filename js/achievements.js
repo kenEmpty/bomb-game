@@ -15,6 +15,7 @@ const ACHIEVEMENTS = [
   { id: 'expert_win', icon: '👑', name: 'Expert初勝利',      cond: 'Expert CPU相手に初めて勝利する',   reward: 50 },
   { id: 'win_10',     icon: '🎖️', name: '10勝達成',          cond: '通算10勝する',                    reward: 30 },
   { id: 'win_50',     icon: '🏆', name: '50勝達成',          cond: '通算50勝する',                    reward: 75 },
+  { id: 'expert_10',  icon: '🏅', name: 'Expert10勝',        cond: 'Expert CPU相手に通算10勝する',     reward: 100 },
   { id: 'bomb_kill',  icon: '💣', name: '爆弾で相手を倒す',   cond: '爆弾を相手に当てて撃破する',       reward: 10 },
   { id: 'team_win',   icon: '🤝', name: 'チーム戦初勝利',     cond: 'チーム戦で初めて勝利する',         reward: 20 },
   { id: 'streak_3',   icon: '⚡', name: '連勝3回',           cond: '3連勝する',                       reward: 25 },
@@ -27,11 +28,12 @@ const AchievementStore = (() => {
       const d = JSON.parse(localStorage.getItem(ACH_STORE_KEY) || '{}');
       return {
         unlocked: Array.isArray(d.unlocked) ? d.unlocked : [],
-        wins:   d.wins   | 0,
-        streak: d.streak | 0,
+        wins:       d.wins       | 0,
+        streak:     d.streak     | 0,
+        expertWins: d.expertWins | 0,
       };
     } catch {
-      return { unlocked: [], wins: 0, streak: 0 };
+      return { unlocked: [], wins: 0, streak: 0, expertWins: 0 };
     }
   }
   function save(d) {
@@ -79,7 +81,11 @@ const AchievementStore = (() => {
         d.streak++;
         tryUnlock(d, ['first_win'], newly);
         if (diff === 'hard')   tryUnlock(d, ['hard_win'], newly);
-        if (diff === 'expert') tryUnlock(d, ['expert_win'], newly);
+        if (diff === 'expert') {
+          tryUnlock(d, ['expert_win'], newly);
+          d.expertWins++;
+          if (d.expertWins >= 10) tryUnlock(d, ['expert_10'], newly);
+        }
         if (mode === 'team')   tryUnlock(d, ['team_win'], newly);
         if (d.wins >= 10)      tryUnlock(d, ['win_10'], newly);
         if (d.wins >= 50)      tryUnlock(d, ['win_50'], newly);
