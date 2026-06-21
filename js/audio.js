@@ -146,6 +146,7 @@ const Sound = {
     if (!this.enabledSE || !this.ctx) return;
     if (profile === 'energy')     this._energyBoom(intensity);
     else if (profile === 'royal') this._royalBoom(intensity);
+    else if (profile === 'magic') this._magicBoom(intensity);
     else                          this._boom(intensity);
   },
 
@@ -256,6 +257,25 @@ const Sound = {
     // 上昇するベル風アルペジオ（ファンファーレの一瞬）
     const notes = [784, 1047, 1319, 1568];
     notes.forEach((f, i) => this._tone(f, t + 0.03 + i * 0.06, 0.3, 'triangle', 0.22));
+  },
+
+  /* 魔法使い：きらめくアルペジオ＋高音シマーを重ねた幻想的な大爆発。 */
+  _magicBoom(intensity) {
+    this._boom(intensity);
+    if (!this.enabledSE || !this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    // 倍音豊かなきらめき（上昇アルペジオ）
+    const notes = [659, 880, 1175, 1568, 2093];
+    notes.forEach((f, i) => this._tone(f, t + 0.02 + i * 0.05, 0.35, 'sine', 0.16));
+    // シマー（高音バンドパスノイズ＝「シャラララ」）
+    const src = this._noise(0.45);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 4200; bp.Q.value = 0.7;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t); src.stop(t + 0.45);
   },
 
   /* ---- BGM（簡単なループ曲） --------------------------------------- */

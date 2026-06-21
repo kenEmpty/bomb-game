@@ -217,6 +217,61 @@ const SKIN_DEFS = [
     explosionSound: 'royal', // 黄金のきらめきを重ねた豪華な爆発音
     victoryEmojis: ['👑', '🌟', '✨', '💛', '🏆'],
   },
+
+  /* ---- 魔法使い（実績「Expert10勝」専用・ショップ購入不可） ---- */
+  {
+    id: 'wizard',
+    name: '魔法使い',
+    desc: '魔法弾・極彩色の大爆発・異世界演出',
+    price: null,            // 購入不可
+    achievementOnly: true,  // 実績でのみ解放
+    unlockHint: 'Expert10勝で解放',
+    drawCharacter(color, num) {
+      return `<svg viewBox="0 0 100 100" class="stick" xmlns="http://www.w3.org/2000/svg">
+        <!-- とんがり帽子 -->
+        <polygon points="50,1 30,40 70,40" fill="#5b3fa0" stroke="#3a2870" stroke-width="2"/>
+        <polygon points="50,1 50,40 70,40" fill="#4a3088"/>
+        <path d="M27 38 Q50 30 73 38 L73 45 Q50 37 27 45 Z" fill="#6b4fb0" stroke="#3a2870" stroke-width="1"/>
+        <text x="50" y="27" text-anchor="middle" font-size="12" fill="#ffe23a">★</text>
+        <!-- 顔 -->
+        <circle cx="50" cy="51" r="15" fill="${color}" stroke="#1b1b2f" stroke-width="3"/>
+        <text x="50" y="57" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">${num}</text>
+        <!-- ローブ＋手足 -->
+        <g stroke="${color}" stroke-width="7" stroke-linecap="round" fill="none">
+          <line x1="50" y1="66" x2="50" y2="86"/>
+          <line x1="50" y1="71" x2="31" y2="80"/>
+          <line x1="50" y1="71" x2="70" y2="64"/>
+          <line x1="50" y1="86" x2="38" y2="98"/>
+          <line x1="50" y1="86" x2="62" y2="98"/>
+        </g>
+        <!-- 杖＋光る球 -->
+        <line x1="70" y1="64" x2="77" y2="40" stroke="#a87a3a" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="77" cy="36" r="8" fill="rgba(125,249,255,0.35)"/>
+        <circle cx="77" cy="36" r="4.5" fill="#7df9ff"/>
+      </svg>`;
+    },
+    projectile: {
+      html: `<svg viewBox="0 0 32 32" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="16" r="11" fill="rgba(180,90,255,0.22)" stroke="#c060ff" stroke-width="1.5"/>
+        <circle cx="16" cy="16" r="6.5" fill="rgba(125,249,255,0.5)"/>
+        <polygon points="16,3 18.5,13 28,16 18.5,19 16,29 13.5,19 4,16 13.5,13" fill="#fff" opacity="0.95"/>
+        <circle cx="16" cy="16" r="2.6" fill="#ffe23a"/>
+      </svg>`,
+      spin: true,
+    },
+    explosionTheme: {
+      // 「とにかく派手」：白→マゼンタ→シアンの閃光、コアは虹色（conic）、火花は多色＆増量
+      flash:        'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,120,255,0.85) 30%, rgba(120,210,255,0.5) 55%, rgba(120,80,255,0) 78%)',
+      core:         'conic-gradient(from 0deg, #ff4fd8, #7df9ff, #ffe23a, #8aff6a, #ff7ab0, #ff4fd8)',
+      ringColor:    'rgba(210,130,255,1)',
+      sparkColors:  ['#ff4fd8', '#7df9ff', '#ffe23a', '#8aff6a', '#ff7ab0', '#ffffff'],
+      sparkGlow:    '#ffffff',
+      debrisBg:     '#3a1a5a',
+      boost:        1.9, // 火花・破片の数を約2倍に
+    },
+    explosionSound: 'magic', // きらめきのアルペジオ＋シマー
+    victoryEmojis: ['🪄', '🔮', '✨', '🌟', '💫', '🧙'],
+  },
 ];
 
 /* ===================================================================
@@ -321,6 +376,17 @@ const SkinStore = (() => {
       if (d.owned.includes(skinId)) return false;
       if (d.points < def.price) return false;
       d.points -= def.price;
+      d.owned.push(skinId);
+      save(d);
+      return true;
+    },
+
+    /* 実績報酬などでスキンを無償付与（ポイント消費なし）。新規付与なら true。 */
+    grant(skinId) {
+      if (DEV) return false; // 開発モードでは本番データを変更しない
+      if (!SKIN_DEFS.some(s => s.id === skinId)) return false;
+      const d = load();
+      if (d.owned.includes(skinId)) return false;
       d.owned.push(skinId);
       save(d);
       return true;

@@ -838,6 +838,7 @@ body.dev-mode .dev-badge { display: block; }
 
 .free-badge  { background: var(--accent); color: #fff; }
 .owned-badge { background: var(--panel-2); color: var(--muted); }
+.ach-only-badge { background: rgba(255, 210, 74, 0.18); color: #ffd24a; }
 
 .skin-price-tag {
   margin-top: 5px;
@@ -938,6 +939,8 @@ body.dev-mode .dev-badge { display: block; }
 }
 .ach-card.ach-locked .ach-reward { color: var(--muted); }
 .ach-reward small { font-size: 0.62rem; font-weight: normal; }
+.ach-skin-reward { display: block; text-align: center; line-height: 1.1; font-size: 1.1rem; }
+.ach-skin-reward small { font-size: 0.58rem; color: #ffe08a; }
 
 /* 実績解除トースト（勝敗オーバーレイ内） */
 #overlay-ach:empty { display: none; }

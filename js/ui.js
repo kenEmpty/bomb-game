@@ -355,9 +355,11 @@ const UI = {
     this._burst('fx-flash', p.x, p.y, size * 2.0 * scale, 300, theme?.flash);
     this._burst('fx-ring',  p.x, p.y, size * 1.1 * scale, 500, null, theme?.ringColor);
     this._burst('fx-core',  p.x, p.y, size * 1.1 * scale, 360, theme?.core);
-    const sparks = 7 + intensity * 3;
+    // theme.boost で火花・破片の数を増やす（魔法使い等の「とにかく派手」用）
+    const boost = theme?.boost || 1;
+    const sparks = Math.round((7 + intensity * 3) * boost);
     for (let i = 0; i < sparks; i++) this._particle('fx-spark', p.x, p.y, size, scale, false, theme);
-    const debris = 5 + intensity * 2;
+    const debris = Math.round((5 + intensity * 2) * boost);
     for (let i = 0; i < debris; i++) this._particle('fx-debris', p.x, p.y, size, scale, true, theme);
   },
 
@@ -380,7 +382,12 @@ const UI = {
     el.className = 'fx ' + cls;
     el.style.left = x + 'px'; el.style.top = y + 'px';
     if (theme) {
-      if (cls === 'fx-spark' && theme.sparkBg) {
+      if (cls === 'fx-spark' && theme.sparkColors) {
+        // 多色スパーク：1粒ごとにランダムな色（魔法使いの極彩色用）
+        const col = theme.sparkColors[(Math.random() * theme.sparkColors.length) | 0];
+        el.style.background = col;
+        el.style.boxShadow  = `0 0 7px ${col}`;
+      } else if (cls === 'fx-spark' && theme.sparkBg) {
         el.style.background = theme.sparkBg;
         el.style.boxShadow  = `0 0 6px ${theme.sparkGlow || '#ffb347'}`;
       } else if (cls === 'fx-debris' && theme.debrisBg) {

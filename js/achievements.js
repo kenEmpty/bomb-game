@@ -15,7 +15,7 @@ const ACHIEVEMENTS = [
   { id: 'expert_win', icon: '👑', name: 'Expert初勝利',      cond: 'Expert CPU相手に初めて勝利する',   reward: 50 },
   { id: 'win_10',     icon: '🎖️', name: '10勝達成',          cond: '通算10勝する',                    reward: 30 },
   { id: 'win_50',     icon: '🏆', name: '50勝達成',          cond: '通算50勝する',                    reward: 75 },
-  { id: 'expert_10',  icon: '🏅', name: 'Expert10勝',        cond: 'Expert CPU相手に通算10勝する',     reward: 100 },
+  { id: 'expert_10',  icon: '🏅', name: 'Expert10勝',        cond: 'Expert CPU相手に通算10勝する',     reward: 0, rewardSkin: 'wizard' },
   { id: 'bomb_kill',  icon: '💣', name: '爆弾で相手を倒す',   cond: '爆弾を相手に当てて撃破する',       reward: 10 },
   { id: 'team_win',   icon: '🤝', name: 'チーム戦初勝利',     cond: 'チーム戦で初めて勝利する',         reward: 20 },
   { id: 'streak_3',   icon: '⚡', name: '連勝3回',           cond: '3連勝する',                       reward: 25 },
@@ -47,7 +47,8 @@ const AchievementStore = (() => {
       const def = ACHIEVEMENTS.find(a => a.id === id);
       if (!def) continue;
       d.unlocked.push(id);
-      SkinStore.addPoints(def.reward);
+      if (def.reward > 0) SkinStore.addPoints(def.reward);
+      if (def.rewardSkin) SkinStore.grant(def.rewardSkin); // スキン報酬を解放
       newly.push(def);
     }
   }
@@ -116,13 +117,16 @@ const Achievements = {
       const isUnlocked = unlocked.has(def.id);
       const card = document.createElement('div');
       card.className = 'ach-card' + (isUnlocked ? ' ach-unlocked' : ' ach-locked');
+      const rewardHtml = def.rewardSkin
+        ? `<span class="ach-skin-reward">🎁<br><small>${SkinStore.getSkinDef(def.rewardSkin).name}</small></span>`
+        : `+${def.reward}<small>pt</small>`;
       card.innerHTML = `
         <div class="ach-icon">${isUnlocked ? def.icon : '🔒'}</div>
         <div class="ach-info">
           <div class="ach-name">${def.name}</div>
           <div class="ach-cond">${def.cond}</div>
         </div>
-        <div class="ach-reward">+${def.reward}<small>pt</small></div>
+        <div class="ach-reward">${rewardHtml}</div>
       `;
       grid.appendChild(card);
     }
@@ -131,9 +135,12 @@ const Achievements = {
   /* 新規解除をオーバーレイ用HTMLにする（main.jsから利用） */
   newlyHtml(list) {
     if (!list || !list.length) return '';
-    const rows = list.map(a =>
-      `<div class="ach-toast-row"><span>${a.icon} 実績解除：${a.name}</span><span class="ach-toast-pt">+${a.reward}pt</span></div>`
-    ).join('');
+    const rows = list.map(a => {
+      const rwd = a.rewardSkin
+        ? `🎁 ${SkinStore.getSkinDef(a.rewardSkin).name}`
+        : `+${a.reward}pt`;
+      return `<div class="ach-toast-row"><span>${a.icon} 実績解除：${a.name}</span><span class="ach-toast-pt">${rwd}</span></div>`;
+    }).join('');
     return `<div class="ach-toast">${rows}</div>`;
   },
 };
